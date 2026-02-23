@@ -208,7 +208,12 @@ def predict_price(distance_km, truck_category, traffic_level, time_of_day, is_pe
     
     # Initialize model if not already trained
     if _model is None:
-        _train_pricing_model()
+        _model, _label_encoders, _features = _train_pricing_model()
+    
+    # Type assertion (Pylance)
+    assert _label_encoders is not None, "Label encoders not initialized"
+    assert _model is not None, "Model not initialized"
+    assert _features is not None, "Features not initialized"
     
     # Map vehicle categories
     truck_map = {
