@@ -44,11 +44,8 @@ KATHMANDU_DISTANCES = {
 }
 
 # TRUCKBID vehicle rates - based on actual Kathmandu prices
-VEHICLE_RATES = {
-    "small_vehicle": {"rate_per_km": 18, "min_charge": 400, "max_price": 1500},      # Tempo/Small van
-    "medium_vehicle": {"rate_per_km": 25, "min_charge": 700, "max_price": 2500},    # Medium truck
-    "large_vehicle": {"rate_per_km": 35, "min_charge": 1200, "max_price": 4000},    # Large truck
-}
+# ML-based pricing model is used exclusively (pricing_module.py)
+# No fallback to simple rate-based calculations
 
 # Traffic multipliers - TRUCKBID system
 TRAFFIC_MULTIPLIERS = {
@@ -261,12 +258,7 @@ def book():  # Booking function - safar book garna ko
         time_period = get_time_period(time_of_day)
         peak_hour = is_peak_hour(time_of_day)
         
-        # DEBUG: Log all parameters before prediction
-        import sys
-        print(f"[DEBUG BOOKING] Distance: {distance} km", file=sys.stderr)
-        print(f"[DEBUG BOOKING] Truck: {truck_category}, Traffic: {traffic_category}", file=sys.stderr)
-        print(f"[DEBUG BOOKING] Time: {time_period}, Peak: {peak_hour}", file=sys.stderr)
-        
+        # Calculate price using ML model
         price = predict_price(
             distance_km=distance,
             truck_category=truck_category,
@@ -274,8 +266,6 @@ def book():  # Booking function - safar book garna ko
             time_of_day=time_period,
             is_peak_hour=peak_hour
         )
-        
-        print(f"[DEBUG BOOKING] Predicted Price: Rs{price}", file=sys.stderr)
         
         # For display purposes, calculate traffic multiplier based on chosen level
         try:
@@ -333,7 +323,7 @@ def book():  # Booking function - safar book garna ko
         origin_lng=origin_lng,
         dest_lat=dest_lat,
         dest_lng=dest_lng,
-        vehicle_types=VEHICLE_RATES.keys(),
+        vehicle_types=["small_vehicle", "medium_vehicle", "large_vehicle"],
         ongoing_booking=ongoing_booking,
     )
 
