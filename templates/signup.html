@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="auth-wrapper">
+    <div class="auth-card card fade-in">
+    <h2>Create Your Account</h2>
+    <form method="POST" enctype="multipart/form-data">
+      {{ form.hidden_tag() }}
+
+      <div class="mb-3">
+        {{ form.username.label(class_='form-label') }}
+        {{ form.username(class_='form-control') }}
+        {% if form.username.errors %}
+          <ul class="errors">{% for e in form.username.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.full_name.label(class_='form-label') }}
+        {{ form.full_name(class_='form-control') }}
+      </div>
+
+      <div class="mb-3">
+        {{ form.phone.label(class_='form-label') }}
+        {{ form.phone(class_='form-control') }}
+      </div>
+
+      <div class="mb-3">
+        {{ form.age.label(class_='form-label') }}
+        {{ form.age(class_='form-control') }}
+      </div>
+
+      <div class="mb-3">
+        {{ form.email.label(class_='form-label') }}
+        {{ form.email(class_='form-control') }}
+        {% if form.email.errors %}
+          <ul class="errors">{% for e in form.email.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.password.label(class_='form-label') }}
+        {{ form.password(class_='form-control') }}
+        {% if form.password.errors %}
+          <ul class="errors">{% for e in form.password.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.confirm.label(class_='form-label') }}
+        {{ form.confirm(class_='form-control') }}
+        {% if form.confirm.errors %}
+          <ul class="errors">{% for e in form.confirm.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+
+      <div class="form-check mb-3">
+        {{ form.driver(class_='form-check-input', id='driver-check') }} <label class="form-check-label" for="driver-check">Are you a driver?</label>
+      </div>
+
+      <div id="driver-fields" style="display:none;">
+        <div class="mb-3">
+          {{ form.vehicle_name.label(class_='form-label') }}
+          {{ form.vehicle_name(class_='form-control') }}
+        </div>
+        <div class="mb-3">
+          {{ form.vehicle_brand.label(class_='form-label') }}
+          {{ form.vehicle_brand(class_='form-control') }}
+        </div>
+        <div class="mb-3">
+          {{ form.vehicle_plate.label(class_='form-label') }}
+          {{ form.vehicle_plate(class_='form-control') }}
+        </div>
+        <div class="mb-3">
+          {{ form.driver_license.label(class_='form-label') }}
+          {{ form.driver_license(class_='form-control', accept='image/*,.pdf') }}
+        </div>
+        <div class="mb-3">
+          {{ form.driver_bluebook.label(class_='form-label') }}
+          {{ form.driver_bluebook(class_='form-control', accept='image/*,.pdf') }}
+        </div>
+        <div class="mb-3">
+          {{ form.driver_photo.label(class_='form-label') }}
+          {{ form.driver_photo(class_='form-control', accept='image/*') }}
+        </div>
+      </div>
+
+      <div class="mb-3">{{ form.submit(class_='btn btn-primary w-100') }}</div>
+    </form>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const driverCheck = document.getElementById('driver-check');
+  const driverFields = document.getElementById('driver-fields');
+  function toggleDriverFields(){
+    driverFields.style.display = driverCheck.checked ? 'block' : 'none';
+  }
+  driverCheck.addEventListener('change', toggleDriverFields);
+  toggleDriverFields();
+</script>
+{% endblock %}

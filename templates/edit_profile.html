@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="card p-4 mx-auto" style="max-width:720px;">
+    <h2 class="mb-3">Edit Profile</h2>
+    <form method="POST" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label class="form-label">Full name</label>
+        <input name="full_name" class="form-control" value="{{ current_user.full_name or '' }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Phone</label>
+        <input name="phone" class="form-control" value="{{ current_user.phone or '' }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Age</label>
+        <input name="age" type="number" class="form-control" value="{{ current_user.age or '' }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Profile picture (upload)</label>
+        <input type="file" name="profile_pic" class="form-control">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Vehicle information (if driver)</label>
+        <input name="vehicle_info" class="form-control" value="{{ current_user.vehicle_info or '' }}">
+      </div>
+      <div class="form-check mb-3">
+        <input type="checkbox" name="driver_available" class="form-check-input" id="driver_available" {% if current_user.driver_available %}checked{% endif %}>
+        <label class="form-check-label" for="driver_available">Available for driving</label>
+      </div>
+      <div class="mb-3">
+        <button class="btn btn-primary" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+{% endblock %}

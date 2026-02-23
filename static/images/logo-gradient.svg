@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="56" viewBox="0 0 240 56" role="img" aria-label="Furniture Mover logo">
+  <defs>
+    <linearGradient id="lg" x1="0" x2="1">
+      <stop offset="0%" stop-color="#ff7eb6"/>
+      <stop offset="50%" stop-color="#7afcff"/>
+      <stop offset="100%" stop-color="#ffd47a"/>
+    </linearGradient>
+  </defs>
+  <rect rx="8" width="240" height="56" fill="url(#lg)" />
+  <g transform="translate(12,12)">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 12h3l2 3 3-6 5 6h3" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </g>
+  <text x="56" y="36" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="18" fill="#1b2330">Furniture Mover</text>
+</svg>

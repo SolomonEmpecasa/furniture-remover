@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="profile-page">
+    <div class="glass-card profile-hero">
+      <div class="profile-head d-flex flex-wrap align-items-center gap-4">
+        <img class="profile-pic" src="{{ current_user.profile_pic or 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=60' }}" alt="Profile picture">
+        <div class="flex-grow-1">
+          <h2 class="mb-1">{{ current_user.full_name or current_user.username }}</h2>
+          <div class="profile-meta">
+            <span><i class="fa-solid fa-envelope"></i> {{ current_user.email }}</span>
+            <span><i class="fa-solid fa-phone"></i> {{ current_user.phone or '—' }}</span>
+            <span><i class="fa-solid fa-user"></i> {{ current_user.role }}</span>
+          </div>
+          {% set avg_rating = current_user.get_average_rating() %}
+          {% if avg_rating > 0 %}
+            <p class="mb-0">
+              <strong>Rating:</strong>
+              <span class="badge bg-warning text-dark">{{ "%.1f"|format(avg_rating) }}⭐</span>
+              <small class="text-muted">({{ current_user.get_total_ratings() }} reviews)</small>
+            </p>
+          {% endif %}
+        </div>
+        <div class="profile-actions">
+          <a href="{{ url_for('rating.view_ratings', user_id=current_user.id) }}" class="btn btn-outline-light btn-sm">View My Ratings</a>
+          <a href="{{ url_for('auth.edit_profile') }}" class="btn btn-outline-light">Edit Profile</a>
+          <a href="{{ url_for('booking.book') }}" class="btn btn-primary">New Booking</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mt-2">
+      <div class="col-lg-4">
+        <div class="glass-card profile-stats">
+          <h4>Booking Summary</h4>
+          <div class="stats-grid">
+            <div>
+              <span class="stat-label">Pending</span>
+              <span class="stat-value">{{ bookings | selectattr('status', 'equalto', 'pending') | list | length }}</span>
+            </div>
+            <div>
+              <span class="stat-label">Arrived</span>
+              <span class="stat-value">{{ bookings | selectattr('status', 'equalto', 'arrived') | list | length }}</span>
+            </div>
+            <div>
+              <span class="stat-label">In Transit</span>
+              <span class="stat-value">{{ bookings | selectattr('status', 'equalto', 'in_transit') | list | length }}</span>
+            </div>
+            <div>
+              <span class="stat-label">Delivered</span>
+              <span class="stat-value">{{ bookings | selectattr('status', 'equalto', 'delivered') | list | length }}</span>
+            </div>
+          </div>
+          {% if bookings %}
+            <button class="btn btn-primary w-100 mt-3" data-bs-toggle="modal" data-bs-target="#myBookingsModal">
+              📋 View All Bookings ({{ bookings | length }})
+            </button>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-lg-8">
+        <div class="glass-card quick-access">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0">Quick Access</h4>
+            <span class="text-muted">Most recent bookings</span>
+          </div>
+          {% if bookings %}
+            <ul class="list-unstyled mb-0">
+              {% for b in (bookings | reverse | list)[:4] %}
+                <li class="quick-item">
+                  <div>
+                    <a href="{{ url_for('booking.booking_detail', booking_id=b.id) }}" class="text-decoration-none">
+                      <strong>{{ b.origin }}</strong> → <strong>{{ b.destination }}</strong>
+                    </a>
+                    <div class="text-muted small">{{ b.date }}</div>
+                  </div>
+                  <span class="badge status-{{ b.status|lower|replace('_', '-') }}">{{ b.status|replace('_', ' ')|title }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>No bookings yet. <a href="{{ url_for('booking.book') }}">Create one</a>.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- My Bookings Modal -->
+  <div class="modal fade" id="myBookingsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content glass-modal booking-history-modal">
+        <div class="modal-header" style="background: var(--gradient-primary); color: white;">
+          <h5 class="modal-title">📋 Your Booking History</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="booking-list">
+            {% for b in bookings | reverse %}
+              <div class="booking-card booking-history-card">
+                <div class="booking-main">
+                  <div class="booking-route">
+                    <a href="{{ url_for('booking.booking_detail', booking_id=b.id) }}" class="text-decoration-none">
+                      <strong>{{ b.origin }}</strong> → <strong>{{ b.destination }}</strong>
+                    </a>
+                  </div>
+                  <div class="booking-meta">On {{ b.date }} • ₹{{ b.price }}</div>
+                  <div class="booking-meta">
+                    <small>
+                      Payment: {{ b.payment_method|replace('_', ' ')|title }} by {{ b.payment_by|title }}
+                      {% if b.payment_method in ['cash', 'on_delivery'] %}
+                        • {{ 'Received' if b.payment_received else 'Pending' }}
+                      {% else %}
+                        • Paid (Online)
+                      {% endif %}
+                    </small>
+                  </div>
+                </div>
+                <div class="booking-side">
+                  <div class="badge status-{{ b.status|lower|replace('_', '-') }}">{{ b.status|replace('_', ' ')|title }}</div>
+                  {% if b.status == 'delivered' %}
+                    <div class="badge bg-success">✓ Delivered</div>
+                    {% if b.payment_method in ['cash', 'on_delivery'] %}
+                      <div class="small text-muted">{{ 'Payment received' if b.payment_received else 'Payment pending' }}</div>
+                    {% else %}
+                      <div class="small text-muted">Paid</div>
+                    {% endif %}
+                  {% elif b.status == 'in_transit' %}
+                    <div class="badge bg-info">📍 In Transit</div>
+                  {% endif %}
+                  {% if b.driver_id %}
+                    <div class="driver-info">Driver: {{ b.driver.username }}</div>
+                    {% if b.status == 'delivered' %}
+                      {% if b.driver_rating %}
+                        <div class="small text-muted">Your rating: {{ b.driver_rating }}⭐</div>
+                        {% if b.driver_feedback %}
+                          <div class="small text-muted fst-italic">"{{ b.driver_feedback }}"</div>
+                        {% endif %}
+                      {% endif %}
+                      {% if b.user_rating %}
+                        <div class="small text-info">Driver rated you: {{ b.user_rating }}⭐</div>
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+                  <div class="booking-actions">
+                    <a href="{{ url_for('booking.booking_detail', booking_id=b.id) }}" class="btn btn-sm btn-outline-primary">View Details</a>
+                    {% if b.status in ['pending', 'accepted'] and b.user_id == current_user.id %}
+                      <form method="POST" action="{{ url_for('booking.cancel_booking', booking_id=b.id) }}" onsubmit="return confirm('Are you sure you want to cancel this booking?');">
+                        <button class="btn ghost" type="submit">Cancel</button>
+                      </form>
+                    {% elif b.status == 'delivered' and not b.driver_rating %}
+                      <a href="{{ url_for('rating.rate_driver', booking_id=b.id) }}" class="btn btn-warning btn-sm">Rate Driver</a>
+                    {% elif b.driver_rating %}
+                      <div class="small text-success">✓ You rated: {{ b.driver_rating }}⭐</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+{% endblock %}

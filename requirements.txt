@@ -1,0 +1,13 @@
+Flask==2.3.3
+Werkzeug==2.3.7
+Flask-SQLAlchemy==3.0.5
+Flask-Login==0.6.3
+Flask-WTF==1.1.1
+WTForms==3.0.1
+email-validator==1.3.1
+openrouteservice
+mysql-connector-python==8.1.0
+pymysql==1.0.3
+python-dotenv==1.0.0
+scikit-learn==1.3.2
+numpy==1.24.3

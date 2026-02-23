@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <section class="stats-section fade-in">
+    <div class="row g-4">
+      <div class="col-md-3">
+        <div class="glass-card stat-card">
+          <i class="fa-solid fa-truck-fast"></i>
+          <h3>3,200+</h3>
+          <p>Successful deliveries</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="glass-card stat-card">
+          <i class="fa-solid fa-location-dot"></i>
+          <h3>35+</h3>
+          <p>Coverage zones</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="glass-card stat-card">
+          <i class="fa-solid fa-star"></i>
+          <h3>4.9/5</h3>
+          <p>Customer rating</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="glass-card stat-card">
+          <i class="fa-solid fa-user-shield"></i>
+          <h3>100%</h3>
+          <p>Insured moves</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="services py-5">
+    <div class="section-header text-center">
+      <p class="section-kicker">Why Maal Gaadi</p>
+      <h2 class="section-title">Premium Logistics Experience</h2>
+      <p class="section-subtitle">Fast booking, verified drivers, and transparent pricing for a reliable move every time.</p>
+    </div>
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="glass-card h-100">
+          <img src="/static/images/House moving.jpg" class="card-img-top" alt="House moving">
+          <div class="card-body">
+            <h3 class="card-title">House Moving</h3>
+            <p class="card-text">Short and long distance moves available. Free estimates and insured crews. We pad, wrap and load with care.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="glass-card h-100">
+          <img src="/static/images/location tracking.jpg" class="card-img-top" alt="GPS tracking">
+          <div class="card-body">
+            <h3 class="card-title">Live Tracking</h3>
+            <p class="card-text">Real-time GPS tracking, ETA updates, and status notifications to your phone.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="glass-card h-100">
+          <img src="/static/images/insurance options.jpg" class="card-img-top" alt="Insurance">
+          <div class="card-body">
+            <h3 class="card-title">Premium Protection</h3>
+            <p class="card-text">Protect your items — choose premium coverage for extra safety, including fragile-item insurance.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="features mt-5">
+      <div class="feature">
+        <i class="fa-solid fa-people-group"></i>
+        <div>
+          <h4>Professional Crews</h4>
+          <p>Trained teams with protective equipment and packing materials.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <i class="fa-solid fa-chart-line"></i>
+        <div>
+          <h4>Transparent Pricing</h4>
+          <p>Clear quotes with optional add-ons and no hidden fees.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <i class="fa-solid fa-calendar-check"></i>
+        <div>
+          <h4>Flexible Scheduling</h4>
+          <p>Book same-day or choose a future date with flexible time windows.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="testimonials mt-5">
+    <div class="section-header text-center">
+      <p class="section-kicker">Customer stories</p>
+      <h2 class="section-title">Trusted by Kathmandu families</h2>
+    </div>
+    {% if site_feedbacks %}
+      <div class="row g-4">
+        {% for fb in site_feedbacks %}
+          <div class="col-md-6">
+            <div class="glass-card testimonial-card h-100">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="badge bg-light text-dark text-uppercase">{{ fb.author_role or 'user' }}</div>
+                <div class="text-warning fw-bold">{{ fb.rating }}★</div>
+              </div>
+              <div class="testimonial-quote">{{ fb.feedback or 'No comment provided.' }}</div>
+              <div class="testimonial-author">
+                {% set avatar = fb.author.profile_pic if fb.author and fb.author.profile_pic else 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=60' %}
+                <img src="{{ avatar }}" alt="{{ fb.author.username if fb.author else 'User' }} profile">
+                <div>
+                  <strong>{{ fb.author.full_name if fb.author and fb.author.full_name else (fb.author.username if fb.author else 'Customer') }}</strong>
+                  <br><small>Delivery #{{ fb.booking_id }}</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-info">No feedback yet. Complete a delivery to leave the first website review.</div>
+    {% endif %}
+  </section>
+
+  <section class="traffic-section py-5">
+    <div class="section-header text-center">
+      <p class="section-kicker">Traffic intelligence</p>
+      <h2 class="section-title">Kathmandu Traffic Guide</h2>
+      <p class="section-subtitle">We adjust ETAs and recommend prices based on real traffic patterns.</p>
+    </div>
+
+    <div class="row g-4 mb-5">
+      <div class="col-md-4">
+        <div class="glass-card h-100 traffic-card traffic-light">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0">Light</h4>
+            <span class="badge bg-success text-white">1.0x</span>
+          </div>
+          <ul class="mb-3">
+            <li>Smooth flow, rare stops</li>
+            <li>Outskirts, residential toles</li>
+            <li>Ring Road late night / early morning</li>
+          </ul>
+          <div class="mt-auto">Speed: 25–40 km/h</div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="glass-card h-100 traffic-card traffic-medium">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0">Medium</h4>
+            <span class="badge bg-warning text-dark">1.25x – 1.35x</span>
+          </div>
+          <ul class="mb-3">
+            <li>Slower, occasional stops</li>
+            <li>Ring Road (non-peak), main roads outside core city</li>
+            <li>Office areas outside rush hour</li>
+          </ul>
+          <div class="mt-auto">Speed: 15–25 km/h</div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="glass-card h-100 traffic-card traffic-heavy">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0">Heavy</h4>
+            <span class="badge bg-danger">1.5x – 1.8x</span>
+          </div>
+          <ul class="mb-3">
+            <li>Frequent stops, long queues</li>
+            <li>Kalanki, Koteshwor, Baneshwor, Gongabu, Balkhu, New Road</li>
+            <li>Delays unpredictable</li>
+          </ul>
+          <div class="mt-auto">Speed: 5–15 km/h</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="vehicles-section py-5">
+    <div class="section-header text-center">
+      <p class="section-kicker">Vehicle fleet</p>
+      <h2 class="section-title">Transport Vehicles & Capacities</h2>
+      <p class="section-subtitle">Typical vehicle types used across Nepal and approximate capacities.</p>
+    </div>
+
+    <div class="row g-4 mb-4">
+      <div class="col-md-4">
+        <div class="glass-card vehicle-card">
+          <img src="/static/images/vehicles/tata ace.jpg" alt="Small Vehicle">
+          <div class="vehicle-content">
+            <h3>Small Vehicle</h3>
+            <p><strong>Capacity:</strong> ~0.75 tonne</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="glass-card vehicle-card">
+          <img src="/static/images/vehicles/tata intra.jpg" alt="Medium Vehicle">
+          <div class="vehicle-content">
+            <h3>Medium Vehicle</h3>
+            <p><strong>Capacity:</strong> ~2.5 tonne</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="glass-card vehicle-card">
+          <img src="/static/images/vehicles/eicher pro.jpg" alt="Large Vehicle">
+          <div class="vehicle-content">
+            <h3>Large Vehicle</h3>
+            <p><strong>Capacity:</strong> ~4 tonne</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="note text-muted text-center">Capacities are approximate — exact vehicle models and capacities vary.</p>
+    <p class="text-center"><a class="btn btn-primary btn-lg" href="{{ url_for('main.vehicles') }}">See full vehicle guidance</a></p>
+  </section>
+{% endblock %}

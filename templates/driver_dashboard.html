@@ -1,0 +1,481 @@
+{% extends 'base.html' %}
+{% block content %}
+  <style>
+    .driver-header {
+      background: var(--gradient-accent);
+      color: white;
+      padding: 32px;
+      border-radius: 20px;
+      margin-bottom: 32px;
+      box-shadow: var(--shadow-xl);
+    }
+    
+    .driver-header h2 {
+      margin: 0;
+      font-weight: 800;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .status-alert {
+      padding: 20px;
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-md);
+      font-weight: 500;
+    }
+    
+    .booking-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 24px;
+      margin-top: 24px;
+    }
+    
+    .booking-card-driver {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: var(--shadow-md);
+      transition: all 0.3s ease;
+      border-left: 4px solid var(--primary);
+    }
+    
+    .booking-card-driver:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-xl);
+    }
+    
+    .booking-card-driver.delivered {
+      border-left-color: var(--success);
+    }
+    
+    .booking-card-driver.in-transit {
+      border-left-color: var(--info);
+    }
+  </style>
+
+  <div class="driver-header">
+    <h2>🚗 Driver Dashboard</h2>
+    <p class="mb-0" style="opacity: 0.95;">Manage your deliveries and track your earnings</p>
+  </div>
+
+  {% if applicant_status == 'pending' %}
+      <div class="status-alert alert alert-warning">
+        <strong>⏳ Application Pending</strong><br>
+        Your driver application is under review. You'll get access once approved by admin.
+      </div>
+    {% elif applicant_status == 'rejected' %}
+      <div class="status-alert alert alert-danger">
+        <strong>❌ Application Rejected</strong><br>
+        {% if applicant_feedback %}Admin feedback: {{ applicant_feedback }}{% endif %}
+      </div>
+      <div class="card mt-3 p-3">
+        <h5>Reapply as Driver</h5>
+        <form method="POST" action="{{ url_for('driver.driver_reapply') }}" enctype="multipart/form-data" class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Vehicle name/model</label>
+            <input name="vehicle_name" class="form-control" value="{{ current_user.vehicle_name or '' }}" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Vehicle brand</label>
+            <input name="vehicle_brand" class="form-control" value="{{ current_user.vehicle_brand or '' }}" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Vehicle plate number</label>
+            <input name="vehicle_plate" class="form-control" value="{{ current_user.vehicle_plate or '' }}" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Driver license (image/pdf)</label>
+            <input type="file" name="driver_license" class="form-control" accept="image/*,.pdf" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Blue book (image/pdf)</label>
+            <input type="file" name="driver_bluebook" class="form-control" accept="image/*,.pdf" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Driver photo</label>
+            <input type="file" name="driver_photo" class="form-control" accept="image/*" />
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary" type="submit">Submit Reapplication</button>
+          </div>
+        </form>
+      </div>
+    {% elif current_user.role == 'admin' %}
+      <p class="text-muted">Admin view: you can inspect driver assignments and pending jobs without taking driver actions.</p>
+    {% endif %}
+    
+    {% if applicant_status not in ['pending', 'rejected'] or current_user.role in ['driver', 'admin'] %}
+      <div class="mb-4">
+        <h3 class="mb-3" style="color: var(--primary); font-weight: 700;">📦 My Accepted Bookings</h3>
+        {% if accepted_bookings %}
+          <div class="card p-4">
+            <div class="row g-3 mb-3">
+              <div class="col-md-3">
+                <div class="stat-box" style="background: var(--gradient-primary); color: white; padding: 20px; border-radius: 12px; text-align: center;">
+                  <h2 class="mb-0">{{ accepted_bookings | length }}</h2>
+                  <small>Total Deliveries</small>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-box" style="background: var(--gradient-accent); color: white; padding: 20px; border-radius: 12px; text-align: center;">
+                  <h2 class="mb-0">{{ accepted_bookings | selectattr('status', 'equalto', 'in_transit') | list | length }}</h2>
+                  <small>In Transit</small>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-box" style="background: var(--gradient-success); color: white; padding: 20px; border-radius: 12px; text-align: center;">
+                  <h2 class="mb-0">{{ accepted_bookings | selectattr('status', 'equalto', 'delivered') | list | length }}</h2>
+                  <small>Completed</small>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-box" style="background: linear-gradient(135deg, #fbbf24, #f59e0b); color: white; padding: 20px; border-radius: 12px; text-align: center;">
+                  <h2 class="mb-0">{{ accepted_bookings | selectattr('status', 'in', ['arrived', 'accepted']) | list | length }}</h2>
+                  <small>Arrived at Pickup</small>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-lg btn-primary w-100" data-bs-toggle="modal" data-bs-target="#myDeliveriesModal">
+              🚚 View All Deliveries
+            </button>
+          </div>
+        {% else %}
+          <div class="card p-4 text-center text-muted">
+            <p class="mb-0">No accepted bookings yet. Check pending bookings below to get started! 🚀</p>
+          </div>
+        {% endif %}
+      </div>
+
+      {% if accepted_bookings %}
+        {% set ongoing = accepted_bookings | selectattr('status', 'in', ['arrived', 'accepted', 'in_transit']) | list %}
+        {% if ongoing %}
+          {% set current_booking = ongoing[0] %}
+          {% set payment_status_label = 'Received' if current_booking.payment_received else 'Pending' %}
+          {% set status_label = 'En Route' if current_booking.status == 'in_transit' else ('Arrived at Pickup' if current_booking.status in ['arrived', 'accepted'] else current_booking.status|replace('_', ' ')|title) %}
+          <div class="mb-4">
+            <h3 class="mb-3" style="color: var(--accent); font-weight: 700;">🚚 Ongoing Delivery</h3>
+            <div class="card p-4 ongoing-card-clickable" data-journey-url="{{ url_for('driver.view_journey', booking_id=current_booking.id) }}">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                  <div class="fw-bold">Journey in Progress</div>
+                  <div class="text-muted">Delivery Details</div>
+                </div>
+                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('driver.view_journey', booking_id=current_booking.id) }}">View Journey</a>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-md-6"><strong>From:</strong> {{ current_booking.origin }}</div>
+                <div class="col-md-6"><strong>To:</strong> {{ current_booking.destination }}</div>
+                <div class="col-md-6"><strong>Customer:</strong> {{ current_booking.user.full_name or current_booking.user.username }}</div>
+                <div class="col-md-6"><strong>Phone:</strong> {{ current_booking.user.phone or 'Not provided' }}</div>
+                <div class="col-md-6"><strong>Price:</strong> {{ current_booking.price }} NPR</div>
+                <div class="col-md-6"><strong>Payment:</strong> {{ current_booking.payment_method|replace('_', ' ')|title }} by {{ current_booking.payment_by|title }}</div>
+                <div class="col-md-6"><strong>Payment Status:</strong> {{ payment_status_label }}</div>
+                <div class="col-md-6"><strong>Status:</strong> {{ status_label }}</div>
+              </div>
+
+              <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                  <small class="text-muted">Progress</small>
+                  <small class="text-muted" id="ongoing-progress-text">0%</small>
+                </div>
+                <div class="progress" style="height: 8px;">
+                  <div class="progress-bar" id="ongoing-progress-bar" role="progressbar" style="width: 0%;"></div>
+                </div>
+              </div>
+              <div class="text-muted mb-3" id="ongoing-distance-duration">Total distance: -- km | Duration: ~-- mins</div>
+
+              {% if current_booking.origin_lat and current_booking.origin_lng and current_booking.dest_lat and current_booking.dest_lng %}
+                <div id="ongoing-driver-map"
+                     data-status="{{ current_booking.status }}"
+                     data-origin-lat="{{ current_booking.origin_lat }}"
+                     data-origin-lng="{{ current_booking.origin_lng }}"
+                     data-dest-lat="{{ current_booking.dest_lat }}"
+                     data-dest-lng="{{ current_booking.dest_lng }}"
+                     style="height: 280px; border-radius: 12px; overflow: hidden;"></div>
+              {% endif %}
+
+              <div class="mt-3 d-flex flex-wrap gap-2">
+                {% if current_booking.status in ['arrived', 'accepted'] %}
+                  <form method="POST" action="{{ url_for('driver.start_journey', booking_id=current_booking.id) }}" style="display:inline;">
+                    {% if current_booking.payment_method in ['on_delivery', 'cash'] and current_booking.payment_by == 'sender' %}
+                      <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" name="payment_received" id="pickup_payment_received_dashboard">
+                        <label class="form-check-label" for="pickup_payment_received_dashboard">Payment received from sender</label>
+                      </div>
+                    {% endif %}
+                    <button class="btn btn-success mt-2" id="start-journey-btn-dashboard" {% if current_booking.payment_method in ['on_delivery', 'cash'] and current_booking.payment_by == 'sender' %}disabled{% endif %}>Start Journey</button>
+                  </form>
+                {% elif current_booking.status == 'in_transit' %}
+                  <form method="POST" action="{{ url_for('driver.mark_delivered', booking_id=current_booking.id) }}" style="display:inline;">
+                    {% if current_booking.payment_method in ['on_delivery', 'cash'] and current_booking.payment_by == 'receiver' %}
+                      <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" name="payment_received" id="delivery_payment_received_dashboard">
+                        <label class="form-check-label" for="delivery_payment_received_dashboard">Payment received from receiver</label>
+                      </div>
+                    {% endif %}
+                    <button class="btn btn-primary mt-2" id="mark-delivered-btn-dashboard" {% if current_booking.payment_method in ['on_delivery', 'cash'] and current_booking.payment_by == 'receiver' %}disabled{% endif %}>Mark as Delivered</button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      {% endif %}
+
+      <div class="mb-4">
+        <h3 class="mb-3" style="color: var(--secondary); font-weight: 700;">🔔 Pending Bookings</h3>
+        {% if bookings %}
+          <div class="row g-3">
+            {% for b in bookings %}
+              <div class="col-md-6">
+                <div class="card p-3">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <div class="fw-bold">{{ b.origin }} → {{ b.destination }}</div>
+                      <div class="text-muted">On {{ b.date }}</div>
+                      <div class="mt-1"><strong>Customer:</strong> {{ b.user.full_name or b.user.username }}</div>
+                      <div class="mt-1"><strong>Phone:</strong> {{ b.user.phone or 'Not provided' }}</div>
+                      <div class="mt-1"><strong>Price:</strong> {{ b.price }} NPR</div>
+                      <div class="mt-1"><strong>Payment by:</strong> {{ b.payment_by|title }} ({{ b.payment_method|replace('_', ' ')|title }})</div>
+                    </div>
+                    <div>
+                      {% if current_user.role == 'driver' or current_user.role == 'admin' %}
+                        <form method="POST" action="{{ url_for('driver.driver_accept', booking_id=b.id) }}">
+                          <button class="btn btn-primary btn-sm w-100">✓ Accept Booking</button>
+                        </form>
+                      {% else %}
+                        <span class="badge bg-secondary">View only</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                  {% if b.origin_lat and b.origin_lng and b.dest_lat and b.dest_lng %}
+                    <div class="mt-3">
+                      <div id="pending-map-{{ b.id }}" class="booking-map" data-origin-lat="{{ b.origin_lat }}" data-origin-lng="{{ b.origin_lng }}" data-dest-lat="{{ b.dest_lat }}" data-dest-lng="{{ b.dest_lng }}" style="height: 220px; border-radius: 10px; overflow: hidden;"></div>
+                      <small class="text-muted d-block mt-2">Pickup and route preview</small>
+                    </div>
+                  {% else %}
+                    <small class="text-muted d-block mt-2">Map preview unavailable (missing coordinates).</small>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="card p-4 text-center text-muted">
+            <p class="mb-0">No pending bookings at the moment. 📭</p>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- My Deliveries Modal -->
+  <div class="modal fade" id="myDeliveriesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header" style="background: var(--gradient-primary); color: white;">
+          <h5 class="modal-title">🚚 My Delivery Details</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {% if accepted_bookings %}
+            <div class="booking-grid">
+              {% for b in accepted_bookings %}
+                <div class="booking-card-driver {% if b.status == 'delivered' %}delivered{% elif b.status == 'in_transit' %}in-transit{% endif %}">
+                  <div class="fw-bold mb-3" style="color: var(--primary); font-size: 1.15rem;">
+                    📍 {{ b.origin }} → {{ b.destination }}
+                  </div>
+                  <div class="mb-2"><strong>Customer:</strong> {{ b.user.full_name or b.user.username }}</div>
+                  <div class="mb-2"><strong>Phone:</strong> {{ b.user.phone or 'Not provided' }}</div>
+                  <div class="mb-2"><strong>Delivery Location:</strong> {{ b.destination }}</div>
+                  <div class="mb-2"><strong>Price:</strong> {{ b.price }} NPR</div>
+                  <div class="mb-2"><strong>Payment:</strong> {{ b.payment_method|replace('_', ' ')|title }} by {{ b.payment_by|title }}</div>
+                  <div class="text-muted mb-2"><strong>Date:</strong> {{ b.date }}</div>
+                  {% if current_user.role == 'admin' and b.driver %}
+                    <div class="mb-2"><strong>Driver:</strong> {{ b.driver.full_name or b.driver.username }} ({{ b.driver.phone or 'No phone' }})</div>
+                  {% endif %}
+                  {% if b.status == 'delivered' %}
+                    {% if b.driver_rating %}
+                      <div class="small text-info mb-2">Customer rated you: {{ b.driver_rating }}⭐</div>
+                    {% endif %}
+                    {% if b.user_rating %}
+                      <div class="small text-muted mb-2">You rated customer: {{ b.user_rating }}⭐</div>
+                    {% endif %}
+                  {% endif %}
+                  <div class="d-flex gap-2 mt-3">
+                    {% if (current_user.role == 'driver') or (current_user.role == 'admin' and b.driver_id == current_user.id) %}
+                      {% if b.status in ['arrived', 'accepted'] %}
+                        <a href="{{ url_for('driver.view_journey', booking_id=b.id) }}" class="btn btn-sm btn-success">Open Journey</a>
+                      {% elif b.status == 'in_transit' %}
+                        <a href="{{ url_for('driver.view_journey', booking_id=b.id) }}" class="btn btn-sm btn-info">View Journey</a>
+                        <form method="POST" action="{{ url_for('driver.mark_delivered', booking_id=b.id) }}" style="display:inline;">
+                          {% if b.payment_method in ['on_delivery', 'cash'] %}
+                            <div class="form-check mt-2">
+                              <input class="form-check-input payment-received-check" type="checkbox" name="payment_received" id="payment_received_{{ b.id }}">
+                              <label class="form-check-label" for="payment_received_{{ b.id }}">Payment received</label>
+                            </div>
+                          {% endif %}
+                          <button class="btn btn-sm btn-primary mt-2" {% if b.payment_method in ['on_delivery', 'cash'] %}disabled data-requires-payment="true"{% endif %}>Mark as Delivered</button>
+                        </form>
+                      {% elif b.status == 'delivered' %}
+                        <span class="badge bg-success">Delivered</span>
+                        {% if b.payment_method == 'on_delivery' %}
+                          <span class="badge bg-warning">Collect Payment: {{ b.price }} NPR</span>
+                        {% endif %}
+                        {% if not b.user_rating %}
+                          <a href="{{ url_for('rating.rate_user', booking_id=b.id) }}" class="btn btn-sm btn-warning mt-2">Rate Customer</a>
+                        {% else %}
+                          <div class="small text-success mt-2">✓ You rated: {{ b.user_rating }}⭐</div>
+                        {% endif %}
+                      {% endif %}
+                    {% else %}
+                      <span class="badge bg-secondary">View only</span>
+                      {% if b.status in ['accepted', 'in_transit', 'delivered'] %}
+                        <a href="{{ url_for('driver.view_journey', booking_id=b.id) }}" class="btn btn-sm btn-info">View Journey</a>
+                      {% endif %}
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block extra_js %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('.ongoing-card-clickable').forEach(function (card) {
+        card.addEventListener('click', function (event) {
+          if (event.target.closest('form, button, input, label, a, .leaflet-container')) return;
+          const url = card.dataset.journeyUrl;
+          if (url) {
+            window.location.href = url;
+          }
+        });
+      });
+
+      document.querySelectorAll('.payment-received-check').forEach(function (checkbox) {
+        checkbox.addEventListener('change', function () {
+          const form = checkbox.closest('form');
+          if (!form) return;
+          const button = form.querySelector('button[data-requires-payment="true"]');
+          if (!button) return;
+          button.disabled = !checkbox.checked;
+        });
+      });
+
+      document.querySelectorAll('[id^="pending-map-"]').forEach(function (el) {
+        const originLat = parseFloat(el.dataset.originLat);
+        const originLng = parseFloat(el.dataset.originLng);
+        const destLat = parseFloat(el.dataset.destLat);
+        const destLng = parseFloat(el.dataset.destLng);
+        if (!originLat || !originLng || !destLat || !destLng) return;
+
+        const map = L.map(el).setView([originLat, originLng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        L.marker([originLat, originLng]).addTo(map).bindPopup('Pickup');
+        L.marker([destLat, destLng]).addTo(map).bindPopup('Destination');
+
+        fetch(`https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=full&geometries=geojson`)
+          .then(r => r.json())
+          .then(data => {
+            if (!data.routes || !data.routes.length) return;
+            const route = data.routes[0];
+            const routeCoords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+            const line = L.polyline(routeCoords, { color: '#2563eb', weight: 4, opacity: 0.7 }).addTo(map);
+            map.fitBounds(line.getBounds(), { padding: [10, 10] });
+          })
+          .catch(() => {});
+      });
+
+      const ongoingEl = document.getElementById('ongoing-driver-map');
+      if (ongoingEl) {
+        const status = ongoingEl.dataset.status;
+        const originLat = parseFloat(ongoingEl.dataset.originLat);
+        const originLng = parseFloat(ongoingEl.dataset.originLng);
+        const destLat = parseFloat(ongoingEl.dataset.destLat);
+        const destLng = parseFloat(ongoingEl.dataset.destLng);
+        const distanceDurationEl = document.getElementById('ongoing-distance-duration');
+        const progressTextEl = document.getElementById('ongoing-progress-text');
+        const progressBarEl = document.getElementById('ongoing-progress-bar');
+
+        if (originLat && originLng && destLat && destLng) {
+          const ongoingMap = L.map(ongoingEl).setView([originLat, originLng], 13);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(ongoingMap);
+          const driverMarker = L.marker([originLat, originLng]).addTo(ongoingMap);
+
+          fetch(`https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=full&geometries=geojson`)
+            .then(r => r.json())
+            .then(data => {
+              if (!data.routes || !data.routes.length) return;
+              const route = data.routes[0];
+              const routeCoords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+              const line = L.polyline(routeCoords, { color: '#2563eb', weight: 4, opacity: 0.7 }).addTo(ongoingMap);
+              ongoingMap.fitBounds(line.getBounds(), { padding: [10, 10] });
+
+              if (distanceDurationEl) {
+                const distanceKm = (route.distance / 1000).toFixed(2);
+                const durationMins = Math.max(1, Math.round(route.duration / 60));
+                distanceDurationEl.textContent = `Total distance: ${distanceKm} km | Duration: ~${durationMins} mins`;
+              }
+
+              if (progressTextEl && progressBarEl) {
+                const initialProgress = status === 'in_transit' ? 11 : 0;
+                progressTextEl.textContent = `${initialProgress}%`;
+                progressBarEl.style.width = `${initialProgress}%`;
+              }
+
+              if (status === 'in_transit') {
+                let step = 0;
+                const totalSteps = routeCoords.length;
+                const stepDuration = Math.max(30000 / totalSteps, 80);
+                const interval = setInterval(() => {
+                  if (step >= totalSteps) {
+                    clearInterval(interval);
+                    driverMarker.setLatLng(routeCoords[totalSteps - 1]);
+                    if (progressTextEl && progressBarEl) {
+                      progressTextEl.textContent = '100%';
+                      progressBarEl.style.width = '100%';
+                    }
+                    return;
+                  }
+                  driverMarker.setLatLng(routeCoords[step]);
+                  if (progressTextEl && progressBarEl) {
+                    const progress = Math.min(100, Math.round((step / totalSteps) * 100));
+                    progressTextEl.textContent = `${progress}%`;
+                    progressBarEl.style.width = `${progress}%`;
+                  }
+                  step += 1;
+                }, stepDuration);
+              }
+            })
+            .catch(() => {});
+        }
+      }
+
+      const pickupPaymentCheck = document.getElementById('pickup_payment_received_dashboard');
+      const startJourneyBtn = document.getElementById('start-journey-btn-dashboard');
+      if (pickupPaymentCheck && startJourneyBtn) {
+        pickupPaymentCheck.addEventListener('change', function () {
+          startJourneyBtn.disabled = !pickupPaymentCheck.checked;
+        });
+      }
+
+      const deliveryPaymentCheck = document.getElementById('delivery_payment_received_dashboard');
+      const deliveredBtn = document.getElementById('mark-delivered-btn-dashboard');
+      if (deliveryPaymentCheck && deliveredBtn) {
+        deliveryPaymentCheck.addEventListener('change', function () {
+          deliveredBtn.disabled = !deliveryPaymentCheck.checked;
+        });
+      }
+    });
+  </script>
+{% endblock %}

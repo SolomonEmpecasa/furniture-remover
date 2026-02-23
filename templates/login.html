@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="auth-wrapper">
+    <div class="auth-card card fade-in">
+    <h2 class="mb-3">Welcome Back</h2>
+    <form method="POST">
+      {{ form.hidden_tag() }}
+      <div class="mb-3">
+        {{ form.username.label(class_='form-label') }}
+        {{ form.username(class_='form-control') }}
+      </div>
+      <div class="mb-3">
+        {{ form.password.label(class_='form-label') }}
+        {{ form.password(class_='form-control') }}
+      </div>
+      <div class="mb-3">{{ form.submit(class_='btn btn-primary w-100') }}</div>
+    </form>
+    <p class="mt-2">New user? <a href="{{ url_for('auth.signup') }}">Register here</a></p>
+    </div>
+  </div>
+{% endblock %}

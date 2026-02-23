@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="card p-4 mx-auto" style="max-width:560px;">
+    <h2 class="mb-2">Admin Sign Up (protected)</h2>
+    <p class="text-muted">This form is only available if you have a registration token.</p>
+    <form method="POST">
+      <div class="mb-3">
+        <label class="form-label">Registration token</label>
+        <input name="token" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input name="username" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input name="email" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input name="password" type="password" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <button class="btn btn-primary" type="submit">Create admin</button>
+      </div>
+    </form>
+  </div>
+{% endblock %}

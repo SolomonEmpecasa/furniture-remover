@@ -1,0 +1,12 @@
+<!-- Helper note: To enable server-side routing or distance calculations,
+     set ORS_API_KEY in your environment (.env) and use the openrouteservice client.
+     Example (server-side):
+
+     import openrouteservice
+     client = openrouteservice.Client(key=os.environ['ORS_API_KEY'])
+     coords = ((origin_lng, origin_lat), (dest_lng, dest_lat))
+     r = client.directions(coords)
+     # r['routes'][0]['summary']['distance'] gives meters
+
+     For live traffic-aware routing consider Mapbox or HERE (requires paid plans).
+-->

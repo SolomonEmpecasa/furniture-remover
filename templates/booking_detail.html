@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+{% block content %}
+  <style>
+    .booking-detail-header {
+      background: var(--gradient-primary);
+      color: white;
+      padding: 28px;
+      border-radius: 18px;
+      box-shadow: var(--shadow-lg);
+      margin-bottom: 24px;
+    }
+    .detail-card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 20px;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .detail-label {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    .detail-value {
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .tracking-map {
+      height: 360px;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .status-pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      display: inline-block;
+    }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-accepted { background: #dbeafe; color: #1e40af; }
+    .status-in_transit { background: #e0f2fe; color: #0369a1; }
+    .status-delivered { background: #dcfce7; color: #166534; }
+  </style>
+
+  <div class="booking-detail-header">
+    <h2 class="mb-1">📦 Booking Details</h2>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <span class="status-pill status-{{ booking.status|lower|replace('_', '-') }}">{{ booking.status|replace('_', ' ')|title }}</span>
+      <span>Booking ID: #{{ booking.id }}</span>
+    </div>
+  </div>
+
+  <div class="detail-card">
+    <div class="detail-grid">
+      <div>
+        <div class="detail-label">Pickup</div>
+        <div class="detail-value">{{ booking.origin }}</div>
+      </div>
+      <div>
+        <div class="detail-label">Destination</div>
+        <div class="detail-value">{{ booking.destination }}</div>
+      </div>
+      <div>
+        <div class="detail-label">Date</div>
+        <div class="detail-value">{{ booking.date }}</div>
+      </div>
+      <div>
+        <div class="detail-label">Time</div>
+        <div class="detail-value">{{ booking.booking_time or '—' }}</div>
+      </div>
+      {% if booking.status == 'delivered' or booking.delivered_at %}
+        <div>
+          <div class="detail-label">Delivered At</div>
+          <div class="detail-value">
+            {{ booking.delivered_at.strftime('%Y-%m-%d %H:%M') if booking.delivered_at else '—' }}
+          </div>
+        </div>
+      {% endif %}
+      <div>
+        <div class="detail-label">Price</div>
+        <div class="detail-value">₨{{ booking.price }}</div>
+      </div>
+      <div>
+        <div class="detail-label">Traffic</div>
+        <div class="detail-value">{{ booking.traffic_level|default('—')|title }} ({{ booking.traffic_multiplier|default('—') }}x)</div>
+      </div>
+      <div>
+        <div class="detail-label">Payment</div>
+        <div class="detail-value">
+          {{ booking.payment_method|replace('_', ' ')|title }} by {{ booking.payment_by|title }}
+          {% if booking.payment_method in ['cash', 'on_delivery'] %}
+            {% set payment_confirmed = booking.payment_received and booking.status in ['in_transit', 'delivered'] %}
+            • <span class="text-{{ 'success' if payment_confirmed else 'warning' }}">
+              {{ 'Payment received' if payment_confirmed else 'Payment pending' }}
+            </span>
+          {% else %}
+            • <span class="text-success">Paid (Online)</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-card">
+    <h5 class="mb-3">🚚 Driver Details</h5>
+    {% if booking.driver %}
+      <div class="detail-grid">
+        <div>
+          <div class="detail-label">Driver Name</div>
+          <div class="detail-value">{{ booking.driver.full_name or booking.driver.username }}</div>
+        </div>
+        <div>
+          <div class="detail-label">Phone</div>
+          <div class="detail-value">{{ booking.driver.phone or '—' }}</div>
+        </div>
+        <div>
+          <div class="detail-label">Plate Number</div>
+          <div class="detail-value">{{ booking.driver.vehicle_plate or '—' }}</div>
+        </div>
+      </div>
+    {% else %}
+      <p class="text-muted mb-0">Driver not assigned yet. You will see driver details once assigned.</p>
+    {% endif %}
+  </div>
+
+  {% if booking.status != 'delivered' %}
+    <div class="detail-card">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">📍 Live Driver Tracking (Demo)</h5>
+        <small class="text-muted">Updates every 2s (simulated)</small>
+      </div>
+      <div id="booking-detail-map" class="tracking-map" aria-label="Live tracking map"></div>
+      <div class="d-flex gap-2 mt-3">
+        <a class="btn btn-outline-primary" href="{{ url_for('main.profile') }}">Back to Profile</a>
+      </div>
+    </div>
+  {% else %}
+    <div class="detail-card">
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">✅ Delivery Complete</h5>
+        <a class="btn btn-outline-primary" href="{{ url_for('main.profile') }}">Back to Profile</a>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+  {% if booking.status != 'delivered' %}
+    <script>
+      (function(){
+        const originLat = {{ booking.origin_lat or 'null' }};
+        const originLng = {{ booking.origin_lng or 'null' }};
+        const destLat = {{ booking.dest_lat or 'null' }};
+        const destLng = {{ booking.dest_lng or 'null' }};
+        const status = "{{ booking.status }}";
+
+        if (!originLat || !originLng || !destLat || !destLng) return;
+
+        const map = L.map('booking-detail-map').setView([originLat, originLng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+        const originMarker = L.marker([originLat, originLng]).addTo(map).bindPopup('Pickup');
+        const destMarker = L.marker([destLat, destLng]).addTo(map).bindPopup('Destination');
+
+        const driverMarker = L.marker([originLat, originLng], {
+          icon: L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+          })
+        }).addTo(map).bindPopup('Driver (demo)');
+
+        function notifyArrival(message) {
+          const alert = document.createElement('div');
+          alert.className = 'alert alert-success mt-3';
+          alert.textContent = message;
+          document.querySelector('.detail-card').prepend(alert);
+          setTimeout(() => alert.remove(), 6000);
+          window.setTimeout(() => window.alert(message), 300);
+        }
+
+        if (status === 'arrived') {
+          notifyArrival('🚚 Driver has arrived at your pickup location.');
+        }
+
+        fetch(`https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=full&geometries=geojson`)
+          .then(r => r.json())
+          .then(data => {
+            if (!data.routes || !data.routes.length) return;
+            const route = data.routes[0];
+            const routeCoords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+
+            const line = L.polyline(routeCoords, { color: '#2563eb', weight: 4, opacity: 0.7 }).addTo(map);
+            map.fitBounds(line.getBounds(), { padding: [30, 30] });
+
+            if (status !== 'in_transit') return;
+
+            let step = 0;
+            const totalSteps = routeCoords.length;
+            const stepDuration = Math.max(30000 / totalSteps, 80);
+
+            const interval = setInterval(() => {
+              if (step >= totalSteps) {
+                clearInterval(interval);
+                driverMarker.setLatLng(routeCoords[totalSteps - 1]);
+                notifyArrival('✅ Driver has reached the destination.');
+                return;
+              }
+              driverMarker.setLatLng(routeCoords[step]);
+              step += 1;
+            }, stepDuration);
+          });
+      })();
+    </script>
+  {% endif %}
+{% endblock %}

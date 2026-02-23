@@ -1,0 +1,1019 @@
+{% extends 'base.html' %}
+{% block content %}
+  <style>
+    .booking-header {
+      background: var(--gradient-success);
+      color: white;
+      padding: 32px;
+      border-radius: 20px;
+      margin-bottom: 32px;
+      box-shadow: var(--shadow-xl);
+      text-align: center;
+    }
+    
+    .booking-header h2 {
+      margin: 0;
+      font-weight: 800;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .booking-form-card {
+      background: white;
+      padding: 32px;
+      border-radius: 20px;
+      box-shadow: var(--shadow-lg);
+    }
+    
+    .map-container {
+      background: white;
+      padding: 24px;
+      border-radius: 20px;
+      box-shadow: var(--shadow-lg);
+      margin-bottom: 24px;
+    }
+    
+    .location-display-card {
+      background: white;
+      padding: 24px;
+      border-radius: 20px;
+      box-shadow: var(--shadow-lg);
+      margin-bottom: 24px;
+    }
+    
+    .location-display {
+      background: #f8fafc;
+      padding: 16px;
+      border-radius: 12px;
+      border-left: 4px solid var(--primary);
+      margin-bottom: 12px;
+    }
+    
+    .location-display strong {
+      display: block;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    
+    .location-display-text {
+      font-size: 1.1rem;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    #price-estimate {
+      background: var(--gradient-success);
+      color: white;
+      border: none;
+      border-radius: 16px;
+      padding: 20px;
+      font-weight: 600;
+      box-shadow: var(--shadow-md);
+    }
+    
+    #price-estimate strong {
+      font-size: 1.1rem;
+    }
+    
+    #price-amount {
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
+
+    .booking-map {
+      height: 400px !important;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .map-button-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .map-button-group button {
+      flex: 1;
+      min-width: 150px;
+    }
+  </style>
+
+  <div class="booking-header">
+    <h2>📦 Book Your Move</h2>
+    <p class="mb-0" style="opacity: 0.95;">We'll automatically use your location. Adjust by clicking on the map</p>
+  </div>
+
+  <div class="container">
+    {% if ongoing_booking %}
+      <div class="booking-form-card" style="margin-bottom: 24px;">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <div>
+            <h4 class="mb-1">📍 Ongoing Booking</h4>
+            <div class="text-muted">{{ ongoing_booking.origin }} → {{ ongoing_booking.destination }}</div>
+            <div class="text-muted">Status: {{ ongoing_booking.status|replace('_', ' ')|title }}</div>
+          </div>
+          <a class="btn btn-primary" href="{{ url_for('booking.booking_detail', booking_id=ongoing_booking.id) }}">View Live Delivery</a>
+        </div>
+        {% if ongoing_booking.origin_lat and ongoing_booking.origin_lng and ongoing_booking.dest_lat and ongoing_booking.dest_lng %}
+          <div id="ongoing-booking-map"
+               data-origin-lat="{{ ongoing_booking.origin_lat }}"
+               data-origin-lng="{{ ongoing_booking.origin_lng }}"
+               data-dest-lat="{{ ongoing_booking.dest_lat }}"
+               data-dest-lng="{{ ongoing_booking.dest_lng }}"
+               style="height: 240px; margin-top: 16px; border-radius: 12px; overflow: hidden;">
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+    <!-- MAP SECTION -->
+    <div class="map-container">
+      <div class="map-button-group">
+        <div style="flex: 1; position: relative;">
+          <input type="text" id="pick-origin" class="form-control" placeholder="📍 Enter or click map for pickup" autocomplete="off">
+          <ul id="origin-suggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; list-style: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto; display: none; z-index: 1000;"></ul>
+        </div>
+        <div style="flex: 1; position: relative;">
+          <input type="text" id="pick-destination" class="form-control" placeholder="📦 Enter or click map for delivery" autocomplete="off">
+          <ul id="destination-suggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; list-style: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto; display: none; z-index: 1000;"></ul>
+        </div>
+        <button id="clear-markers" class="btn btn-outline-danger">Clear</button>
+      </div>
+      <div id="booking-map" class="booking-map" aria-label="Map centered on Kathmandu"></div>
+    </div>
+
+    <!-- BOOKING FORM - REMAINING FIELDS -->
+    <div class="row g-4">
+      <div class="col-lg-8">
+        <div class="booking-form-card">
+          <form method="POST">
+            {{ form.hidden_tag() if form is defined }}
+
+            <div class="mb-3">
+              <label class="form-label">📅 Date</label>
+              <input name="date" type="date" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">⏰ Preferred Pickup Time</label>
+              <input name="time_of_day" id="time_of_day" type="time" class="form-control" required>
+              <small class="text-muted">We detect peak hours automatically and factor traffic into pricing.</small>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">🚚 Vehicle Type</label>
+              <div class="vehicle-select-grid" id="vehicle-select-grid">
+                <label class="vehicle-option">
+                  <input type="radio" name="vehicle_type" value="small_vehicle">
+                  <strong>Small Vehicle</strong>
+                  <span class="text-muted">Tempo/Van · ₨18/km</span>
+                </label>
+                <label class="vehicle-option active">
+                  <input type="radio" name="vehicle_type" value="medium_vehicle" checked>
+                  <strong>Medium Truck</strong>
+                  <span class="text-muted">Standard · ₨25/km</span>
+                </label>
+                <label class="vehicle-option">
+                  <input type="radio" name="vehicle_type" value="large_vehicle">
+                  <strong>Large Truck</strong>
+                  <span class="text-muted">Heavy Haul · ₨35/km</span>
+                </label>
+              </div>
+              <small class="text-muted">Select based on your furniture/cargo size.</small>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">💳 Payment Method</label>
+              <select name="payment_method" class="form-control" required>
+                <option value="">Select payment method</option>
+                <option value="cash">💵 Cash</option>
+                <option value="online">💻 Online</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">👤 Who Pays?</label>
+              <select name="payment_by" class="form-control" required>
+                <option value="sender">Sender (Me)</option>
+                <option value="receiver">Receiver (Destination)</option>
+              </select>
+            </div>
+
+            <!-- Hidden fields for coordinates -->
+            <input type="hidden" id="origin" name="origin" value="">
+            <input type="hidden" id="destination" name="destination" value="">
+            <input type="hidden" id="origin_lat" name="origin_lat" value="">
+            <input type="hidden" id="origin_lng" name="origin_lng" value="">
+            <input type="hidden" id="dest_lat" name="dest_lat" value="">
+            <input type="hidden" id="dest_lng" name="dest_lng" value="">
+            <input type="hidden" id="traffic_level_override" name="traffic_level_override" value="">
+            <input type="hidden" id="traffic_multiplier_override" name="traffic_multiplier_override" value="">
+
+            <!-- Price estimate display -->
+            <div id="price-estimate" style="display:none; margin-bottom: 20px;">
+              <div class="mb-2"><strong>💰 Preliminary Estimate:</strong></div>
+              <div id="price-amount" style="font-size: 1.5rem;">--</div>
+              <small style="opacity: 0.9;">Distance: <span id="distance-amount">--</span> km</small><br>
+              <small style="opacity: 0.9;" id="traffic-label">Traffic: --</small>
+              <div class="price-note" style="opacity: 0.7; font-size: 0.85rem; margin-top: 8px; font-style: italic; background: #f0f0f0; padding: 8px; border-radius: 4px;">
+                Note: This is a rough estimate. Your actual ML-optimized price will be calculated on confirmation based on real-time traffic and market conditions.
+              </div>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary flex-grow-1">🚀 Book Now</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="booking-form-card" style="background: linear-gradient(135deg, #e0f4ff 0%, #f0f9ff 100%);">
+          <h5 style="color: var(--primary); margin-bottom: 16px;">📍 How to Book</h5>
+          <ol style="margin-bottom: 0; color: var(--text-primary);">
+            <li>Click "Pick Pickup Location" button</li>
+            <li>Click on the map where you want to be picked up</li>
+            <li>Click "Pick Delivery Location" button</li>
+            <li>Click on the map where you want to be dropped</li>
+            <li>Fill in other details (date, time, vehicle)</li>
+            <li>Click "Calculate Price" to see estimate</li>
+            <li>Click "Book Now" to confirm</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <style>
+    .suggestions-dropdown {
+      position: absolute;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 10px;
+      max-height: 240px;
+      overflow-y: auto;
+      width: calc(100% - 36px);
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 12px 24px rgba(2, 6, 23, 0.45);
+    }
+    .suggestion-item {
+      padding: 10px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+      color: #f8fafc;
+    }
+    .suggestion-item:hover {
+      background: rgba(37, 99, 235, 0.18);
+    }
+    .suggestion-item small {
+      display: block;
+      color: rgba(226, 232, 240, 0.7);
+    }
+  </style>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const vehicleGrid = document.getElementById('vehicle-select-grid');
+      if (vehicleGrid) {
+        vehicleGrid.querySelectorAll('input[name="vehicle_type"]').forEach(function (input) {
+          input.addEventListener('change', function () {
+            vehicleGrid.querySelectorAll('.vehicle-option').forEach(function (label) {
+              label.classList.remove('active');
+            });
+            const label = input.closest('.vehicle-option');
+            if (label) label.classList.add('active');
+          });
+        });
+      }
+    });
+    (function(){
+      let userLocation = null;
+      const map = L.map('booking-map').setView([27.7172,85.3240], 12); // Kathmandu
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+      }).addTo(map);
+
+      (function renderOngoingBookingMap(){
+        const ongoingEl = document.getElementById('ongoing-booking-map');
+        if (!ongoingEl) return;
+        const originLat = parseFloat(ongoingEl.dataset.originLat);
+        const originLng = parseFloat(ongoingEl.dataset.originLng);
+        const destLat = parseFloat(ongoingEl.dataset.destLat);
+        const destLng = parseFloat(ongoingEl.dataset.destLng);
+        if (!originLat || !originLng || !destLat || !destLng) return;
+
+        const ongoingMap = L.map(ongoingEl).setView([originLat, originLng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(ongoingMap);
+        L.marker([originLat, originLng]).addTo(ongoingMap).bindPopup('Pickup');
+        L.marker([destLat, destLng]).addTo(ongoingMap).bindPopup('Destination');
+
+        fetch(`https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=full&geometries=geojson`)
+          .then(r => r.json())
+          .then(data => {
+            if (!data.routes || !data.routes.length) return;
+            const route = data.routes[0];
+            const routeCoords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+            const line = L.polyline(routeCoords, { color: '#2563eb', weight: 4, opacity: 0.7 }).addTo(ongoingMap);
+            ongoingMap.fitBounds(line.getBounds(), { padding: [10, 10] });
+          })
+          .catch(() => {});
+      })();
+
+      let mode = null; // 'origin' | 'destination' | null
+      const originMarker = L.marker([0,0], { draggable: true, icon: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }) }).addTo(map).setOpacity(0);
+      const destMarker = L.marker([0,0], { draggable: true, icon: L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] }) }).addTo(map).setOpacity(0);
+      
+      const pickOriginBtn = document.getElementById('pick-origin');
+      const pickDestinationBtn = document.getElementById('pick-destination');
+      const originSuggestionsEl = document.getElementById('origin-suggestions');
+      const destinationSuggestionsEl = document.getElementById('destination-suggestions');
+      const clearMarkersBtn = document.getElementById('clear-markers');
+      const timeInput = document.getElementById('time_of_day');
+      const originPlaceholder = pickOriginBtn.getAttribute('placeholder') || '📍 Enter or click map for pickup';
+      const destinationPlaceholder = pickDestinationBtn.getAttribute('placeholder') || '📦 Enter or click map for delivery';
+      
+      let routeLine = null; // Store the route line polyline
+
+      const trafficAreas = [
+        { name: 'Kalanki', coords: [27.6936, 85.2776], base: 'heavy' },
+        { name: 'Koteshwor', coords: [27.6785, 85.3497], base: 'heavy' },
+        { name: 'Baneshwor', coords: [27.6895, 85.3420], base: 'heavy' },
+        { name: 'Gongabu', coords: [27.7316, 85.3146], base: 'heavy' },
+        { name: 'Balkhu', coords: [27.6890, 85.2972], base: 'heavy' },
+        { name: 'New Road', coords: [27.7290, 85.3157], base: 'heavy' },
+        { name: 'Ring Road', coords: [27.7050, 85.3210], base: 'medium' },
+        { name: 'Balaju', coords: [27.7352, 85.3068], base: 'medium' },
+        { name: 'Chabahil', coords: [27.7175, 85.3473], base: 'medium' },
+        { name: 'Lagankhel', coords: [27.6660, 85.3266], base: 'medium' },
+        { name: 'Thamel', coords: [27.7156, 85.3123], base: 'medium' },
+        { name: 'Patan', coords: [27.6560, 85.3161], base: 'medium' },
+        { name: 'Kirtipur', coords: [27.6355, 85.2927], base: 'medium' }
+      ];
+
+      // Create a lookup dictionary for quick coordinate lookup
+      const coordinateLookup = {};
+      trafficAreas.forEach(area => {
+        coordinateLookup[area.name.toLowerCase()] = area.coords;
+      });
+
+      // Auto-populate coordinates when location text matches known areas
+      function autoPopulateCoordinates() {
+        const originText = (pickOriginBtn.value || '').toLowerCase();
+        const destText = (pickDestinationBtn.value || '').toLowerCase();
+        
+        // Check if origin matches a known location
+        for (const [areaName, coords] of Object.entries(coordinateLookup)) {
+          if (originText.includes(areaName)) {
+            document.getElementById('origin_lat').value = coords[0];
+            document.getElementById('origin_lng').value = coords[1];
+            console.log('Auto-populated origin coords:', coords);
+            updatePrice();
+            break;
+          }
+        }
+        
+        // Check if destination matches a known location
+        for (const [areaName, coords] of Object.entries(coordinateLookup)) {
+          if (destText.includes(areaName)) {
+            document.getElementById('dest_lat').value = coords[0];
+            document.getElementById('dest_lng').value = coords[1];
+            console.log('Auto-populated dest coords:', coords);
+            updatePrice();
+            break;
+          }
+        }
+      }
+
+      const trafficLayer = L.layerGroup().addTo(map);
+      const levelColors = { light: '#6bcf63', medium: '#f6c344', heavy: '#e55353' };
+      const trafficMultipliers = { light: 1.0, medium: 1.1, heavy: 1.3 };
+
+      function suggestTrafficLevel(timeStr) {
+        if (!timeStr) return 'medium';
+        const [hStr, mStr] = timeStr.split(':');
+        const h = parseInt(hStr, 10); const m = parseInt(mStr || '0', 10);
+        if (Number.isNaN(h)) return 'medium';
+        const total = h * 60 + m;
+        if ((8 * 60 <= total && total <= 10 * 60 + 30) || (16 * 60 + 30 <= total && total <= 19 * 60 + 30)) return 'heavy';
+        if (11 * 60 <= total && total <= 15 * 60 + 30) return 'medium';
+        return 'light';
+      }
+
+      function getZoneLevel(lat, lng) {
+        if (!lat || !lng) return null;
+        const levels = { light: 1, medium: 2, heavy: 3 };
+        let maxLevel = 0;
+        let maxName = null;
+        for (const area of trafficAreas) {
+          const radius = area.base === 'heavy' ? 750 : 600;
+          const distanceKm = calculateDistance(lat, lng, area.coords[0], area.coords[1]);
+          const distanceMeters = distanceKm * 1000;
+          if (distanceMeters <= radius) {
+            const lvl = levels[area.base] || 0;
+            if (lvl > maxLevel) {
+              maxLevel = lvl;
+              maxName = area.base;
+            }
+          }
+        }
+        if (!maxName) return null;
+        return maxName;
+      }
+
+      function combineTrafficLevel(zoneLevel, timeLevel) {
+        const levels = { light: 1, medium: 2, heavy: 3 };
+        const reverse = { 1: 'light', 2: 'medium', 3: 'heavy' };
+        const zl = levels[zoneLevel] || 0;
+        const tl = levels[timeLevel] || 0;
+        const finalLevel = Math.max(zl, tl || 0);
+        return reverse[finalLevel] || timeLevel || zoneLevel || 'medium';
+      }
+
+      function adjustLevelForTime(base, timeLevel) {
+        if (timeLevel === 'light') {
+          if (base === 'heavy') return 'medium';
+          if (base === 'medium') return 'light';
+          return 'light';
+        }
+        if (timeLevel === 'medium') {
+          if (base === 'light') return 'medium';
+          return base;
+        }
+        return 'heavy';
+      }
+
+      function renderTrafficOverlay(timeStr) {
+        const timeLevel = suggestTrafficLevel(timeStr);
+        trafficLayer.clearLayers();
+        trafficAreas.forEach(area => {
+          const level = adjustLevelForTime(area.base, timeLevel);
+          const circle = L.circle(area.coords, {
+            radius: area.base === 'heavy' ? 750 : 600,
+            color: levelColors[level],
+            fillColor: levelColors[level],
+            fillOpacity: 0.25,
+            weight: 2,
+            interactive: true
+          }).bindPopup(`<strong>${area.name}</strong><br>${level.charAt(0).toUpperCase() + level.slice(1)} traffic`);
+          circle.on('click', function(e) {
+            const clickedLat = e.latlng.lat;
+            const clickedLng = e.latlng.lng;
+            if (mode === 'origin') {
+              reverseGeocode(clickedLat, clickedLng, function(name) {
+                updateOrigin(clickedLat, clickedLng, name);
+              });
+            } else if (mode === 'destination') {
+              reverseGeocode(clickedLat, clickedLng, function(name) {
+                updateDestination(clickedLat, clickedLng, name);
+              });
+            }
+          });
+          trafficLayer.addLayer(circle);
+        });
+      }
+
+      function getZoneLevelForPoint(latlng) {
+        let level = 'light';
+        for (const area of trafficAreas) {
+          const radius = area.base === 'heavy' ? 750 : 600;
+          const center = L.latLng(area.coords[0], area.coords[1]);
+          const distance = latlng.distanceTo(center);
+          if (distance <= radius) {
+            if (area.base === 'heavy') return 'heavy';
+            if (area.base === 'medium') level = 'medium';
+          }
+        }
+        return level;
+      }
+
+      function computeRouteZoneStats(routeCoords) {
+        if (!routeCoords || routeCoords.length < 2) return null;
+        const totals = { light: 0, medium: 0, heavy: 0 };
+        let totalDistance = 0;
+        for (let i = 1; i < routeCoords.length; i += 1) {
+          const a = routeCoords[i - 1];
+          const b = routeCoords[i];
+          const dist = a.distanceTo(b);
+          if (!dist || Number.isNaN(dist)) continue;
+          const mid = L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2);
+          const level = getZoneLevelForPoint(mid);
+          totals[level] += dist;
+          totalDistance += dist;
+        }
+        if (!totalDistance) return null;
+        const fractions = {
+          light: totals.light / totalDistance,
+          medium: totals.medium / totalDistance,
+          heavy: totals.heavy / totalDistance
+        };
+        const weightedMultiplier =
+          fractions.light * trafficMultipliers.light +
+          fractions.medium * trafficMultipliers.medium +
+          fractions.heavy * trafficMultipliers.heavy;
+
+        let dominantLevel = 'light';
+        if (fractions.heavy >= fractions.medium && fractions.heavy >= fractions.light) dominantLevel = 'heavy';
+        else if (fractions.medium >= fractions.light) dominantLevel = 'medium';
+
+        return {
+          fractions,
+          weightedMultiplier,
+          dominantLevel
+        };
+      }
+
+      // Function to set origin
+      function selectOrigin(lat, lng, name) {
+        updateOrigin(lat, lng, name);
+        autoPopulateCoordinates();
+        map.closePopup();
+      }
+
+      // Function to set destination
+      function selectDestination(lat, lng, name) {
+        updateDestination(lat, lng, name);
+        autoPopulateCoordinates();
+        map.closePopup();
+      }
+
+      window.selectOrigin = selectOrigin;
+      window.selectDestination = selectDestination;
+
+      renderTrafficOverlay(timeInput.value);
+
+      // Reverse geocoding function - converts lat/lng to address
+      function reverseGeocode(lat, lng, callback) {
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+          .then(r => r.json())
+          .then(data => {
+            let display = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+            if (data && data.address) {
+              // Try to get a readable location name
+              const addr = data.address;
+              const parts = [];
+              if (addr.suburb) parts.push(addr.suburb);
+              if (addr.neighbourhood) parts.push(addr.neighbourhood);
+              if (parts.length > 0) display = parts.join(', ');
+              else if (data.display_name) {
+                const displayParts = data.display_name.split(',').map(p => p.trim());
+                display = displayParts.slice(0, 2).join(', ');
+              }
+            }
+            callback(display);
+          })
+          .catch(() => callback(`${lat.toFixed(5)}, ${lng.toFixed(5)}`));
+      }
+
+      function formatPlaceName(place) {
+        if (!place) return '';
+        const parts = [];
+        if (place.address) {
+          if (place.address.suburb) parts.push(place.address.suburb);
+          if (place.address.neighbourhood) parts.push(place.address.neighbourhood);
+          if (parts.length) return parts.join(', ');
+        }
+        if (place.display_name) {
+          return place.display_name.split(',').slice(0, 2).join(', ');
+        }
+        return '';
+      }
+
+      function requestUserLocation(callback) {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(
+          function(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            reverseGeocode(lat, lng, function(name) {
+              userLocation = { lat, lng, name };
+              if (callback) callback(lat, lng, name);
+            });
+          },
+          function() {
+            if (callback) callback(null, null, null);
+          }
+        );
+      }
+
+      function renderSuggestions(list, targetEl, onSelect, includeUserLocation) {
+        if (!targetEl) return;
+        targetEl.innerHTML = '';
+        const items = [];
+        if (includeUserLocation) {
+          if (userLocation) {
+            items.push({
+              label: userLocation.name || 'Your location',
+              lat: userLocation.lat,
+              lng: userLocation.lng,
+              meta: 'Current position'
+            });
+          } else {
+            items.push({
+              label: 'Your location',
+              lat: null,
+              lng: null,
+              meta: 'Tap to enable location'
+            });
+          }
+        }
+        list.forEach(item => {
+          const label = formatPlaceName(item) || item.display_name;
+          items.push({
+            label,
+            lat: parseFloat(item.lat),
+            lng: parseFloat(item.lon),
+            meta: item.display_name
+          });
+        });
+
+        items.forEach(item => {
+          const li = document.createElement('li');
+          li.className = 'suggestion-item';
+          li.innerHTML = `<strong>${item.label}</strong>${item.meta ? `<small>${item.meta}</small>` : ''}`;
+          li.addEventListener('click', function () {
+            if (item.lat && item.lng) {
+              onSelect(item.lat, item.lng, item.label);
+              targetEl.style.display = 'none';
+              return;
+            }
+            requestUserLocation(function(lat, lng, name) {
+              if (lat && lng && name) {
+                onSelect(lat, lng, name);
+                targetEl.style.display = 'none';
+              }
+            });
+          });
+          targetEl.appendChild(li);
+        });
+
+        targetEl.style.display = items.length ? 'block' : 'none';
+      }
+
+      function showUserLocationSuggestion(targetEl) {
+        if (!targetEl) return;
+        renderSuggestions([], targetEl, updateOrigin, true);
+      }
+
+      async function fetchSuggestions(query, isOrigin) {
+        const targetEl = isOrigin ? originSuggestionsEl : destinationSuggestionsEl;
+        if (!query || query.length < 2) {
+          if (targetEl) targetEl.style.display = 'none';
+          return;
+        }
+        const params = new URLSearchParams({
+          format: 'json',
+          q: query,
+          addressdetails: '1',
+          limit: '6'
+        });
+        if (userLocation) {
+          const delta = 0.08;
+          const left = userLocation.lng - delta;
+          const right = userLocation.lng + delta;
+          const top = userLocation.lat + delta;
+          const bottom = userLocation.lat - delta;
+          params.set('viewbox', `${left},${top},${right},${bottom}`);
+          params.set('bounded', '1');
+        }
+        try {
+          const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
+          const data = await resp.json();
+          renderSuggestions(
+            data || [],
+            targetEl,
+            isOrigin ? updateOrigin : updateDestination,
+            isOrigin
+          );
+        } catch (e) {
+          if (targetEl) targetEl.style.display = 'none';
+        }
+      }
+
+      function setupSuggestionInput(inputEl, isOrigin) {
+        let timer = null;
+        inputEl.addEventListener('input', function () {
+          clearTimeout(timer);
+          const query = inputEl.value.replace(/^📍|^📦/g, '').trim();
+          timer = setTimeout(() => fetchSuggestions(query, isOrigin), 300);
+        });
+        inputEl.addEventListener('focus', function () {
+          const query = inputEl.value.replace(/^📍|^📦/g, '').trim();
+          if (isOrigin && !query) {
+            showUserLocationSuggestion(originSuggestionsEl);
+            return;
+          }
+          if (query) fetchSuggestions(query, isOrigin);
+        });
+      }
+
+      // Update location display and hidden inputs
+      function updateOrigin(lat, lng, name) {
+        document.getElementById('origin_lat').value = lat;
+        document.getElementById('origin_lng').value = lng;
+        document.getElementById('origin').value = name;
+        originMarker.setLatLng([lat, lng]).setOpacity(1);
+        pickOriginBtn.value = `📍 ${name} (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+        map.setView([lat, lng], 14);
+        drawRoute();
+        updatePrice();
+        setMode(null);
+      }
+
+      function updateDestination(lat, lng, name) {
+        document.getElementById('dest_lat').value = lat;
+        document.getElementById('dest_lng').value = lng;
+        document.getElementById('destination').value = name;
+        destMarker.setLatLng([lat, lng]).setOpacity(1);
+        pickDestinationBtn.value = `📦 ${name} (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+        drawRoute();
+        updatePrice();
+        setMode(null);
+      }
+      
+      // Draw route using Leaflet Routing Machine (actual road routing)
+      function drawRoute() {
+        const oLat = parseFloat(document.getElementById('origin_lat').value);
+        const oLng = parseFloat(document.getElementById('origin_lng').value);
+        const dLat = parseFloat(document.getElementById('dest_lat').value);
+        const dLng = parseFloat(document.getElementById('dest_lng').value);
+        
+        // Remove old route if exists
+        if (routeLine) {
+          routeLine.spliceWaypoints(0, routeLine.getWaypoints().length);
+          map.removeControl(routeLine);
+          routeLine = null;
+        }
+        
+        // If both points selected, create routing
+        if (oLat && oLng && dLat && dLng) {
+          // Use Leaflet Routing Machine to get actual road route
+          routeLine = L.Routing.control({
+            waypoints: [
+              L.latLng(oLat, oLng),
+              L.latLng(dLat, dLng)
+            ],
+            router: L.Routing.osrmv1({
+              serviceUrl: 'https://router.project-osrm.org/route/v1'
+            }),
+            show: false,
+            lineOptions: {
+              styles: [
+                { color: '#2563eb', opacity: 0.8, weight: 4 }
+              ]
+            },
+            addWaypoints: false,
+            draggableWaypoints: false,
+            fitSelectedRoutes: false
+          }).addTo(map);
+
+          routeLine.on('routesfound', function(e) {
+            const route = e.routes && e.routes[0];
+            if (!route || !route.summary) return;
+            const distanceKm = route.summary.totalDistance / 1000;
+            window.latestRouteDistanceKm = distanceKm;
+            const stats = computeRouteZoneStats(route.coordinates);
+            window.latestRouteStats = stats;
+            if (stats) {
+              document.getElementById('traffic_level_override').value = stats.dominantLevel;
+              document.getElementById('traffic_multiplier_override').value = stats.weightedMultiplier.toFixed(3);
+            } else {
+              document.getElementById('traffic_level_override').value = '';
+              document.getElementById('traffic_multiplier_override').value = '';
+            }
+            updatePrice();
+          });
+          
+          // Fit map to show both markers
+          const group = new L.featureGroup([originMarker, destMarker]);
+          map.fitBounds(group.getBounds(), { padding: [50, 50] });
+        }
+      }
+
+      // MAP CLICK HANDLER - This is the key fix
+      map.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        const hasOrigin = !!document.getElementById('origin_lat').value;
+        const hasDestination = !!document.getElementById('dest_lat').value;
+        const effectiveMode = mode;
+
+        if (!effectiveMode) {
+          return;
+        }
+
+        if (effectiveMode === 'origin') {
+          reverseGeocode(lat, lng, function(name) {
+            updateOrigin(lat, lng, name);
+          });
+        } else if (effectiveMode === 'destination') {
+          reverseGeocode(lat, lng, function(name) {
+            updateDestination(lat, lng, name);
+          });
+        }
+      });
+
+      // Button click handlers
+      function setMode(nextMode) {
+        mode = nextMode;
+        if (mode === 'origin') {
+          pickOriginBtn.classList.add('active');
+          pickDestinationBtn.classList.remove('active');
+          pickOriginBtn.placeholder = '📍 Picking Pickup... (Click on Map)';
+        } else if (mode === 'destination') {
+          pickDestinationBtn.classList.add('active');
+          pickOriginBtn.classList.remove('active');
+          pickDestinationBtn.placeholder = '📦 Picking Delivery... (Click on Map)';
+        } else {
+          pickOriginBtn.classList.remove('active');
+          pickDestinationBtn.classList.remove('active');
+          pickOriginBtn.placeholder = originPlaceholder;
+          pickDestinationBtn.placeholder = destinationPlaceholder;
+        }
+      }
+
+      pickOriginBtn.addEventListener('focus', function() {
+        setMode('origin');
+      });
+
+      pickDestinationBtn.addEventListener('focus', function() {
+        setMode('destination');
+      });
+
+      setupSuggestionInput(pickOriginBtn, true);
+      setupSuggestionInput(pickDestinationBtn, false);
+
+      document.addEventListener('click', function (e) {
+        if (!originSuggestionsEl || !destinationSuggestionsEl) return;
+        if (!e.target.closest('#pick-origin') && !e.target.closest('#origin-suggestions')) {
+          originSuggestionsEl.style.display = 'none';
+        }
+        if (!e.target.closest('#pick-destination') && !e.target.closest('#destination-suggestions')) {
+          destinationSuggestionsEl.style.display = 'none';
+        }
+      });
+
+      clearMarkersBtn.addEventListener('click', function() {
+        originMarker.setOpacity(0);
+        destMarker.setOpacity(0);
+        if (routeLine) {
+          map.removeLayer(routeLine);
+          routeLine = null;
+        }
+        document.getElementById('origin_lat').value = '';
+        document.getElementById('origin_lng').value = '';
+        document.getElementById('dest_lat').value = '';
+        document.getElementById('dest_lng').value = '';
+        document.getElementById('origin').value = '';
+        document.getElementById('destination').value = '';
+        pickOriginBtn.value = '';
+        pickDestinationBtn.value = '';
+        setMode(null);
+      });
+
+      // Update traffic overlay when time changes
+      timeInput.addEventListener('change', function() {
+        renderTrafficOverlay(this.value);
+        updatePrice();  // Recalculate price when time changes
+      });
+
+      // Calculate distance and price
+      function calculateDistance(lat1, lng1, lat2, lng2) {
+        const R = 6371; // Earth's radius in km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+        console.log('Calculated raw distance:', distance, 'from', {lat1, lng1, lat2, lng2});
+        // Ensure minimum 1 km to avoid pricing issues
+        return Math.max(distance, 1.0);
+      }
+
+      function syncTrafficFromTime() {
+        const level = suggestTrafficLevel(timeInput.value);
+        renderTrafficOverlay(timeInput.value);
+        return level;
+      }
+
+      // Function to calculate and display price
+      async function updatePrice() {
+        const oLat = parseFloat(document.getElementById('origin_lat').value);
+        const oLng = parseFloat(document.getElementById('origin_lng').value);
+        const dLat = parseFloat(document.getElementById('dest_lat').value);
+        const dLng = parseFloat(document.getElementById('dest_lng').value);
+
+        console.log('updatePrice check - oLat:', oLat, 'oLng:', oLng, 'dLat:', dLat, 'dLng:', dLng);
+
+        if (!(oLat && oLng && dLat && dLng)) {
+          console.log('Missing coordinates, hiding price estimate');
+          document.getElementById('price-estimate').style.display = 'none';
+          return;
+        }
+
+        const checkedVehicle = document.querySelector('input[name="vehicle_type"]:checked');
+        const vehicleType = (checkedVehicle && checkedVehicle.value) ? checkedVehicle.value : 'medium_vehicle';
+        const timeOfDay = document.getElementById('time_of_day').value || '14:00';
+        const originText = document.getElementById('origin').value || '';
+        const destText = document.getElementById('destination').value || '';
+
+        try {
+          const distanceKm = window.latestRouteDistanceKm;
+          const routeStats = window.latestRouteStats;
+          const response = await fetch('/api/price-estimate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              origin: originText,
+              destination: destText,
+              origin_lat: oLat,
+              origin_lng: oLng,
+              dest_lat: dLat,
+              dest_lng: dLng,
+              vehicle_type: vehicleType,
+              time_of_day: timeOfDay,
+              distance_km: distanceKm,
+              traffic_level_override: routeStats ? routeStats.dominantLevel : null,
+              traffic_multiplier_override: routeStats ? routeStats.weightedMultiplier : null
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch price estimate');
+          }
+
+          const data = await response.json();
+          const distance = data.distance_km || 0;
+          const estimatedPrice = data.price || 0;
+          const trafficLevel = data.traffic_level || 'medium';
+          const trafficMult = data.traffic_multiplier || 1.1;
+          const timeLevel = data.time_level || 'medium';
+          const originZone = data.origin_zone || 'unknown';
+          const destZone = data.dest_zone || 'unknown';
+
+          let zoneBreakdown = '';
+          if (routeStats && routeStats.fractions) {
+            const h = Math.round(routeStats.fractions.heavy * 100);
+            const m = Math.round(routeStats.fractions.medium * 100);
+            const l = Math.round(routeStats.fractions.light * 100);
+            zoneBreakdown = `zones H/M/L ${h}%/${m}%/${l}%`;
+          }
+
+          document.getElementById('distance-amount').textContent = Number(distance).toFixed(2);
+          document.getElementById('price-amount').textContent = Number(estimatedPrice).toLocaleString();
+          const zoneText = zoneBreakdown ? `, ${zoneBreakdown}` : `, zones ${originZone}/${destZone}`;
+          document.getElementById('traffic-label').textContent = `Traffic: ${trafficLevel.charAt(0).toUpperCase() + trafficLevel.slice(1)} (${trafficMult.toFixed(2)}x, time ${timeLevel}${zoneText})`;
+          document.getElementById('price-estimate').style.display = 'block';
+        } catch (e) {
+          console.log('Price estimate error:', e);
+          document.getElementById('price-estimate').style.display = 'none';
+        }
+      }
+
+      // Auto-calculate price when vehicle type changes
+      document.querySelectorAll('input[name="vehicle_type"]').forEach(function (radio) {
+        radio.addEventListener('change', updatePrice);
+      });
+      const dateInput = document.querySelector('input[name="date"]');
+      if (dateInput && !dateInput.value) {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        dateInput.value = `${yyyy}-${mm}-${dd}`;
+      }
+      (function setInitialTime(){
+        if (!timeInput) return;
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        timeInput.value = `${hh}:${mm}`;
+        renderTrafficOverlay(timeInput.value);
+      })();
+      
+      // Auto-set pickup location from user's geolocation on page load
+      (function autoGeolocation(){
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            function(position) {
+              const lat = position.coords.latitude;
+              const lng = position.coords.longitude;
+              reverseGeocode(lat, lng, function(name) {
+                userLocation = { lat, lng, name };
+                updateOrigin(lat, lng, name);
+                setMode(null);
+              });
+            },
+            function(error) {
+              console.log('Geolocation error:', error.message);
+              setMode(null);
+            }
+          );
+        }
+      })();
+
+    })();
+  </script>
+{% endblock %}
