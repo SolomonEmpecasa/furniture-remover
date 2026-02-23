@@ -171,7 +171,7 @@ def _train_pricing_model():
     
     for col in categorical_cols:
         le = LabelEncoder()
-        X[col] = le.fit_transform(X[col])
+        X[col] = pd.Series(le.fit_transform(X[col]), index=X.index)
         _label_encoders[col] = le
     
     # Split data
