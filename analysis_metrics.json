@@ -1,0 +1,43 @@
+{
+  "metrics": {
+    "train_r2": 0.9919,
+    "test_r2": 0.9795,
+    "train_mae": 25.57,
+    "test_mae": 38.0,
+    "train_rmse": 37.71,
+    "test_rmse": 53.33,
+    "samples": 1200,
+    "train_samples": 900,
+    "test_samples": 300
+  },
+  "feature_importance": {
+    "truck_category": 0.7941,
+    "is_peak_hour": 0.1518,
+    "traffic_level": 0.0424,
+    "distance_km": 0.0101,
+    "time_of_day": 0.0016
+  },
+  "category_summary": [
+    {
+      "truck_category": "SMALL",
+      "mean": 575.3231039325842,
+      "median": 599.61,
+      "min": 400.0,
+      "max": 791.9
+    },
+    {
+      "truck_category": "MEDIUM",
+      "mean": 1002.8749180327868,
+      "median": 1038.0700000000002,
+      "min": 700.0,
+      "max": 1370.85
+    },
+    {
+      "truck_category": "LARGE",
+      "mean": 1725.5054918032788,
+      "median": 1805.99,
+      "min": 1200.0,
+      "max": 2367.56
+    }
+  ]
+}
