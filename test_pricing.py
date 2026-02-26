@@ -1,5 +1,4 @@
 from pricing_module import predict_price
-import json
 
 print("\n" + "="*80)
 print("ML PRICING MODEL TEST - DISTANCE IMPACT ANALYSIS")

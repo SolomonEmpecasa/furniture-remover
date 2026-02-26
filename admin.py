@@ -7,6 +7,16 @@ from statistics import mean, median
 admin_bp = Blueprint("admin", __name__)
 
 
+def _parse_time_to_minutes(time_str: str | None):
+    if not time_str:
+        return None
+    try:
+        hours_text, minutes_text = time_str.split(":", maxsplit=1)
+        return int(hours_text) * 60 + int(minutes_text)
+    except (TypeError, ValueError):
+        return None
+
+
 def admin_required(f):
     @wraps(f)
     def wrapped(*args, **kwargs):
@@ -33,12 +43,8 @@ def admin_dashboard():
     ]
 
     def time_band(time_str: str | None) -> str:
-        if not time_str:
-            return "Unknown"
-        try:
-            hours, minutes = [int(x) for x in time_str.split(":")]
-            total_minutes = hours * 60 + minutes
-        except Exception:
+        total_minutes = _parse_time_to_minutes(time_str)
+        if total_minutes is None:
             return "Unknown"
         if 5 * 60 <= total_minutes < 12 * 60:
             return "Morning"
@@ -49,12 +55,8 @@ def admin_dashboard():
         return "Night"
 
     def is_peak_hour(time_str: str | None) -> bool:
-        if not time_str:
-            return False
-        try:
-            hours, minutes = [int(x) for x in time_str.split(":")]
-            total_minutes = hours * 60 + minutes
-        except Exception:
+        total_minutes = _parse_time_to_minutes(time_str)
+        if total_minutes is None:
             return False
         return (6 * 60 <= total_minutes <= 9 * 60) or (17 * 60 <= total_minutes <= 20 * 60)
 

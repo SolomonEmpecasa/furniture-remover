@@ -6,6 +6,9 @@ import math
 
 booking_bp = Blueprint("booking", __name__)
 
+DEFAULT_DISTANCE_KM = 1.0
+DEFAULT_COMPARISON_DISTANCES = [2.0, 5.0, 8.0, 12.0, 15.0]
+
 
 def _haversine(lat1, lon1, lat2, lon2):
     R = 6371.0
@@ -29,13 +32,18 @@ def _to_float(value):
 
 def _compute_distance(origin_lat, origin_lng, dest_lat, dest_lng, distance_km):
     if distance_km is not None:
-        try:
-            return float(distance_km)
-        except Exception:
-            return 1.0
-    if origin_lat and origin_lng and dest_lat and dest_lng:
+        parsed_distance = _to_float(distance_km)
+        if parsed_distance is not None:
+            return parsed_distance
+        return DEFAULT_DISTANCE_KM
+    if all(value is not None for value in (origin_lat, origin_lng, dest_lat, dest_lng)):
         return _haversine(origin_lat, origin_lng, dest_lat, dest_lng)
-    return 1.0
+    return DEFAULT_DISTANCE_KM
+
+
+def _parse_optional_float(value):
+    parsed_value = _to_float(value)
+    return parsed_value if parsed_value is not None else None
 
 
 def _is_peak_hour(time_of_day):
@@ -43,14 +51,14 @@ def _is_peak_hour(time_of_day):
         try:
             h = int(time_of_day.split(":")[0])
             return (8 <= h <= 10) or (16 <= h <= 19)
-        except Exception:
+        except (TypeError, ValueError):
             return False
     return False
 
 
 def _parse_distances(raw_value):
     if not raw_value:
-        return [2.0, 5.0, 8.0, 12.0, 15.0]
+        return DEFAULT_COMPARISON_DISTANCES
 
     parsed = []
     for item in str(raw_value).split(","):
@@ -65,7 +73,7 @@ def _parse_distances(raw_value):
             continue
 
     if not parsed:
-        return [2.0, 5.0, 8.0, 12.0, 15.0]
+        return DEFAULT_COMPARISON_DISTANCES
 
     return sorted(set(parsed))
 
@@ -118,7 +126,7 @@ def book():
             price=price,
             distance_km=distance_km,
             traffic_level=traffic_level,
-            traffic_multiplier=float(traffic_multiplier) if traffic_multiplier else None,
+            traffic_multiplier=_parse_optional_float(traffic_multiplier),
             booking_time=time_of_day,
             payment_method=form.get("payment_method"),
             payment_by=form.get("payment_by"),
@@ -236,7 +244,7 @@ def api_price_estimate():
         "price": price_details.get("final_price"),
         "distance_km": float(distance_km),
         "traffic_level": traffic_level,
-        "traffic_multiplier": float(traffic_multiplier) if traffic_multiplier else 1.0,
+        "traffic_multiplier": _parse_optional_float(traffic_multiplier) or 1.0,
         "time_level": "peak" if is_peak else "off-peak",
         "origin_zone": data.get("origin_zone") or "unknown",
         "dest_zone": data.get("dest_zone") or "unknown",

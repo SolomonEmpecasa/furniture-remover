@@ -97,9 +97,9 @@ def rate_user(booking_id):
         return redirect(url_for("driver.driver_dashboard"))
 
     if request.method == "POST":
-        rating_value = int(request.form.get("rating", 0) or 0)
+        rating_value = request.form.get("rating", type=int)
         feedback_text = request.form.get("feedback", "").strip()
-        site_rating_value = int(request.form.get("site_rating", 0) or 0)
+        site_rating_value = request.form.get("site_rating", type=int)
         site_feedback_text = request.form.get("site_feedback", "").strip()
 
         if not rating_value or rating_value < 1 or rating_value > 5:

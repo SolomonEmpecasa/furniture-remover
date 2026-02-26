@@ -1,83 +1,84 @@
-from flask import (  # Flask web framework utilities
-    Blueprint,  # For organizing routes
-    render_template,  # For rendering HTML templates
-    redirect,  # For redirecting to other pages
-    url_for,  # For URL generation
-    flash,  # For displaying flash messages (sandeshas)
-    request,  # For accessing request data
-    current_app,  # For accessing current application
-    abort,  # For raising HTTP errors
+import os
+
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
 )
-from models import db, User  # Database and User model
-from flask_login import login_user, logout_user, login_required, current_user  # Login management
-from flask_wtf import FlaskForm  # Form handling library
-from wtforms import StringField, PasswordField, SubmitField, BooleanField, FileField  # Form field types
-from wtforms.validators import DataRequired, Email, EqualTo, Length  # Form validation rules
-from sqlalchemy.exc import OperationalError  # Database error handling
-from werkzeug.utils import secure_filename  # Secure file upload utilities
-import os  # File and directory operations
+from flask_login import current_user, login_required, login_user, logout_user
+from flask_wtf import FlaskForm
+from models import User, db
+from sqlalchemy.exc import OperationalError
+from werkzeug.utils import secure_filename
+from wtforms import BooleanField, FileField, PasswordField, StringField, SubmitField
+from wtforms.validators import DataRequired, Email, EqualTo, Length
 
 DB_INIT_ERROR_MSG = "Database not initialized. Run `python init_db.py` or enable `AUTO_CREATE_DB` in config."
 
-auth_bp = Blueprint("auth", __name__, template_folder="templates")  # Authentication blueprint (auth ko route)
+auth_bp = Blueprint("auth", __name__, template_folder="templates")
 
 
-class LoginForm(FlaskForm):  # Login form
-    username = StringField("Username", validators=[DataRequired()])  # Username field (required)
-    password = PasswordField("Password", validators=[DataRequired()])  # Password field (required)
+class LoginForm(FlaskForm):
+    username = StringField("Username", validators=[DataRequired()])
+    password = PasswordField("Password", validators=[DataRequired()])
     submit = SubmitField("Login")
 
 
-class SignupForm(FlaskForm):  # Registration form (signup ko form)
+class SignupForm(FlaskForm):
     username = StringField(
-        "Username", validators=[DataRequired(), Length(min=3, max=80)]  # 3-80 characters
+        "Username", validators=[DataRequired(), Length(min=3, max=80)]
     )
-    email = StringField("Email", validators=[DataRequired(), Email()])  # Valid email required
-    full_name = StringField("Full name")  # Optional
-    phone = StringField("Phone")  # Optional  
-    age = StringField("Age")  # Optional
-    vehicle_name = StringField("Vehicle name/model")  # For drivers (driver ko lagi)
-    vehicle_brand = StringField("Vehicle brand")  # For drivers
-    vehicle_plate = StringField("Vehicle plate number")  # For drivers (gaadi ko nambar)
-    driver_license = FileField("Driver license (image/pdf)")  # Driver document
-    driver_bluebook = FileField("Blue book (image/pdf)")  # Vehicle registration
-    driver_photo = FileField("Driver photo")  # Driver photo upload
-    password = PasswordField("Password", validators=[DataRequired(), Length(min=6)])  # Minimum 6 characters
+    email = StringField("Email", validators=[DataRequired(), Email()])
+    full_name = StringField("Full name")
+    phone = StringField("Phone")
+    age = StringField("Age")
+    vehicle_name = StringField("Vehicle name/model")
+    vehicle_brand = StringField("Vehicle brand")
+    vehicle_plate = StringField("Vehicle plate number")
+    driver_license = FileField("Driver license (image/pdf)")
+    driver_bluebook = FileField("Blue book (image/pdf)")
+    driver_photo = FileField("Driver photo")
+    password = PasswordField("Password", validators=[DataRequired(), Length(min=6)])
     confirm = PasswordField(
-        "Confirm Password", validators=[DataRequired(), EqualTo("password")]  # Must match password
+        "Confirm Password", validators=[DataRequired(), EqualTo("password")]
     )
-    driver = BooleanField("Are you a driver?")  # Driver role checkbox (driver ho bhane check gara)
+    driver = BooleanField("Are you a driver?")
     submit = SubmitField("Sign Up")
 
 
-@auth_bp.route("/login", methods=["GET", "POST"])  # Login route - GET: form dikhane ko, POST: login garna ko
-def login():  # Login function
-    form = LoginForm()  # Login form banao
-    if form.validate_on_submit():  # Form valid bhayo ki submit bhayo
-        try:  # Database error handling
-            user = User.query.filter_by(username=form.username.data).first()  # Username se user khojo
-        except OperationalError:  # Database error aye
-            flash(DB_INIT_ERROR_MSG, "danger")  # Error message dikha
-            return redirect(url_for("main.home"))  # Home page ma ja
+@auth_bp.route("/login", methods=["GET", "POST"])
+def login():
+    form = LoginForm()
+    if form.validate_on_submit():
+        try:
+            user = User.query.filter_by(username=form.username.data).first()
+        except OperationalError:
+            flash(DB_INIT_ERROR_MSG, "danger")
+            return redirect(url_for("main.home"))
 
-        if user and user.check_password(form.password.data):  # User exist karega aur password match bhayo
-            login_user(user)  # User ko login session start gara
-            flash("Logged in successfully.", "success")  # Success message
-            return redirect(url_for("main.home"))  # Home page ma redirect gara
-        flash("Invalid username or password", "danger")  # Error message - wrong credentials
-    return render_template("login.html", form=form)  # Login page dikha
+        if user and user.check_password(form.password.data):
+            login_user(user)
+            flash("Logged in successfully.", "success")
+            return redirect(url_for("main.home"))
+        flash("Invalid username or password", "danger")
+    return render_template("login.html", form=form)
 
 
-@auth_bp.route("/signup", methods=["GET", "POST"])  # Signup route - GET: form dikhane ko, POST: register garna ko
-def signup():  # Signup function
-    form = SignupForm()  # Signup form banao
-    if form.validate_on_submit():  # Form valid bhayo
-        try:  # Database error handling
-            if User.query.filter(  # Check gara ki user already achha ki nai
-                (User.username == form.username.data) | (User.email == form.email.data)  # Username ya email match
-            ).first():  # First match khojo
-                flash("Username or email already exists", "warning")  # Already registered message
-                return redirect(url_for("auth.signup"))  # Signup page ma feri ja
+@auth_bp.route("/signup", methods=["GET", "POST"])
+def signup():
+    form = SignupForm()
+    if form.validate_on_submit():
+        try:
+            if User.query.filter(
+                (User.username == form.username.data) | (User.email == form.email.data)
+            ).first():
+                flash("Username or email already exists", "warning")
+                return redirect(url_for("auth.signup"))
         except OperationalError:
             flash(DB_INIT_ERROR_MSG, "danger")
             return redirect(url_for("main.home"))
@@ -103,9 +104,8 @@ def signup():  # Signup function
             f.save(dest)
             return f"/static/uploads/{safe_name}"
 
-        # assign role and default driver availability
         if form.driver.data:
-            user.role = "user"  # keep as user until approved
+            user.role = "user"
             user.driver_status = "pending"
             user.driver_available = False
             user.vehicle_name = form.vehicle_name.data
@@ -133,7 +133,7 @@ def signup():  # Signup function
         flash("Account created and logged in.", "success")
         return redirect(url_for("main.home"))
 
-    return render_template("signup.html", form=form)  # show signup
+    return render_template("signup.html", form=form)
 
 
 @auth_bp.route("/logout")

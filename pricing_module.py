@@ -53,6 +53,44 @@ FUEL_MAINTENANCE_PER_KM = {
     "LARGE": 16.0,
 }
 
+TRUCK_MAP = {
+    "small_vehicle": "SMALL",
+    "medium_vehicle": "MEDIUM",
+    "large_vehicle": "LARGE",
+}
+
+TRAFFIC_MAP = {
+    "light": "Light",
+    "medium": "Medium",
+    "heavy": "Heavy",
+    "very_heavy": "Very Heavy",
+}
+
+VALID_TIME_PERIODS = ["Morning", "Afternoon", "Evening", "Night"]
+
+
+def _normalize_time_period(time_of_day):
+    if isinstance(time_of_day, str) and ':' in time_of_day:
+        hour = int(time_of_day.split(':')[0])
+        if 5 <= hour < 12:
+            return 'Morning'
+        if 12 <= hour < 17:
+            return 'Afternoon'
+        if 17 <= hour < 20:
+            return 'Evening'
+        return 'Night'
+
+    if time_of_day in VALID_TIME_PERIODS:
+        return time_of_day
+    return 'Afternoon'
+
+
+def _normalize_runtime_inputs(truck_category, traffic_level, time_of_day):
+    truck_cat = TRUCK_MAP.get(truck_category, 'MEDIUM')
+    traffic_lev = TRAFFIC_MAP.get(traffic_level, 'Medium')
+    time_period = _normalize_time_period(time_of_day)
+    return truck_cat, traffic_lev, time_period
+
 
 def _get_runtime_factors(traffic_level, time_period, is_peak_hour):
     """Deterministic runtime multipliers for fair and explainable pricing."""
@@ -99,7 +137,9 @@ def _deterministic_breakdown(distance_km, truck_cat, traffic_level, time_period,
 
     subtotal_before_multiplier = distance_fare + fuel_maintenance + labor + service_fee
     traffic_factor, peak_factor, time_factor = _get_runtime_factors(
-        traffic_level, time_period, is_peak_hour
+        traffic_level,
+        time_period,
+        is_peak_hour,
     )
     total_multiplier = traffic_factor * peak_factor * time_factor
 
@@ -192,7 +232,7 @@ def _generate_kathmandu_data(num_samples=500):
     """Generate Kathmandu dataset with REAL prices (from TRUCKBID)"""
     data = []
     
-    for i in range(num_samples):
+    for _ in range(num_samples):
         pickup = random.choice(KATHMANDU_AREAS)
         delivery = random.choice([a for a in KATHMANDU_AREAS if a != pickup])
         
@@ -319,42 +359,6 @@ def predict_price(distance_km, truck_category, traffic_level, time_of_day, is_pe
     assert _model is not None, "Model not initialized"
     assert _features is not None, "Features not initialized"
     
-    # Map vehicle categories
-    truck_map = {
-        'small_vehicle': 'SMALL',
-        'medium_vehicle': 'MEDIUM',
-        'large_vehicle': 'LARGE'
-    }
-    truck_cat = truck_map.get(truck_category, 'MEDIUM')
-    
-    # Map traffic level
-    traffic_map = {
-        'light': 'Light',
-        'medium': 'Medium',
-        'heavy': 'Heavy',
-        'very_heavy': 'Very Heavy'
-    }
-    traffic_lev = traffic_map.get(traffic_level, 'Medium')
-    
-    # Normalize time of day
-    if isinstance(time_of_day, str) and ':' in time_of_day:
-        hour = int(time_of_day.split(':')[0])
-        if 5 <= hour < 12:
-            time_period = 'Morning'
-        elif 12 <= hour < 17:
-            time_period = 'Afternoon'
-        elif 17 <= hour < 20:
-            time_period = 'Evening'
-        else:
-            time_period = 'Night'
-    else:
-        time_period = time_of_day if time_of_day in ['Morning', 'Afternoon', 'Evening', 'Night'] else 'Afternoon'
-    
-    # Encode features
-    truck_encoded = _label_encoders['truck_category'].transform([truck_cat])[0]
-    traffic_encoded = _label_encoders['traffic_level'].transform([traffic_lev])[0]
-    time_encoded = _label_encoders['time_of_day'].transform([time_period])[0]
-    
     details = estimate_price_details(
         distance_km=distance_km,
         truck_category=truck_category,
@@ -376,33 +380,11 @@ def estimate_price_details(distance_km, truck_category, traffic_level, time_of_d
     assert _model is not None, "Model not initialized"
     assert _features is not None, "Features not initialized"
 
-    truck_map = {
-        'small_vehicle': 'SMALL',
-        'medium_vehicle': 'MEDIUM',
-        'large_vehicle': 'LARGE'
-    }
-    truck_cat = truck_map.get(truck_category, 'MEDIUM')
-
-    traffic_map = {
-        'light': 'Light',
-        'medium': 'Medium',
-        'heavy': 'Heavy',
-        'very_heavy': 'Very Heavy'
-    }
-    traffic_lev = traffic_map.get(traffic_level, 'Medium')
-
-    if isinstance(time_of_day, str) and ':' in time_of_day:
-        hour = int(time_of_day.split(':')[0])
-        if 5 <= hour < 12:
-            time_period = 'Morning'
-        elif 12 <= hour < 17:
-            time_period = 'Afternoon'
-        elif 17 <= hour < 20:
-            time_period = 'Evening'
-        else:
-            time_period = 'Night'
-    else:
-        time_period = time_of_day if time_of_day in ['Morning', 'Afternoon', 'Evening', 'Night'] else 'Afternoon'
+    truck_cat, traffic_lev, time_period = _normalize_runtime_inputs(
+        truck_category,
+        traffic_level,
+        time_of_day,
+    )
 
     truck_encoded = _label_encoders['truck_category'].transform([truck_cat])[0]
     traffic_encoded = _label_encoders['traffic_level'].transform([traffic_lev])[0]

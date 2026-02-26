@@ -2,6 +2,7 @@ import os
 
 from flask import Flask
 from flask_login import LoginManager
+from sqlalchemy.exc import SQLAlchemyError
 
 from config import Config
 from models import User, db
@@ -36,7 +37,7 @@ def create_app():
                     try:
                         cols = inspector.get_columns(tname)
                         existing_cols_map[tname] = set(c["name"] for c in cols)
-                    except Exception:
+                    except SQLAlchemyError:
                         existing_cols_map[tname] = set()
 
                 for m in models_to_check:
@@ -74,7 +75,7 @@ def create_app():
                                     col.name,
                                     sqltype,
                                 )
-                        except Exception as e:
+                        except SQLAlchemyError as e:
                             app.logger.warning(
                                 "Could not add column %s to %s: %s", col.name, tname, e
                             )
@@ -86,7 +87,7 @@ def create_app():
                 os.makedirs(upload_folder, exist_ok=True)
                 app.logger.info("Ensured upload folder exists: %s", upload_folder)
 
-            except Exception as e:
+            except SQLAlchemyError as e:
                 app.logger.error("Failed to create DB tables: %s", e)
 
     # Setup Flask-Login
