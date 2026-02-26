@@ -12,7 +12,6 @@ import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 import random
 import warnings
 
@@ -35,6 +34,111 @@ KATHMANDU_AREAS = [
 _model = None
 _label_encoders = None
 _features = None
+
+LABOR_COST = {
+    "SMALL": 120.0,
+    "MEDIUM": 180.0,
+    "LARGE": 260.0,
+}
+
+SERVICE_FEE = {
+    "SMALL": 80.0,
+    "MEDIUM": 120.0,
+    "LARGE": 160.0,
+}
+
+FUEL_MAINTENANCE_PER_KM = {
+    "SMALL": 8.0,
+    "MEDIUM": 12.0,
+    "LARGE": 16.0,
+}
+
+
+def _get_runtime_factors(traffic_level, time_period, is_peak_hour):
+    """Deterministic runtime multipliers for fair and explainable pricing."""
+    traffic_multipliers = {
+        "Light": 1.0,
+        "Medium": 1.1,
+        "Heavy": 1.25,
+        "Very Heavy": 1.4,
+    }
+    traffic_factor = traffic_multipliers.get(traffic_level, 1.1)
+
+    peak_factor = 1.15 if is_peak_hour else 1.0
+
+    time_factor = 1.0
+    if time_period == "Night":
+        time_factor = 0.95
+
+    return traffic_factor, peak_factor, time_factor
+
+
+def _deterministic_price(distance_km, truck_cat, traffic_level, time_period, is_peak_hour):
+    """Compute transparent baseline price that scales fairly with distance."""
+    details = _deterministic_breakdown(
+        distance_km=distance_km,
+        truck_cat=truck_cat,
+        traffic_level=traffic_level,
+        time_period=time_period,
+        is_peak_hour=is_peak_hour,
+    )
+    return float(details["deterministic_total"])
+
+
+def _deterministic_breakdown(distance_km, truck_cat, traffic_level, time_period, is_peak_hour):
+    """Return deterministic cost components and total before ML context adjustment."""
+    distance = max(float(distance_km), 0.0)
+    rate = KTM_RATES[truck_cat]["rate"]
+    min_charge = KTM_RATES[truck_cat]["min"]
+    max_charge = KTM_RATES[truck_cat]["max"]
+
+    distance_fare = distance * rate
+    fuel_maintenance = distance * FUEL_MAINTENANCE_PER_KM.get(truck_cat, 10.0)
+    labor = LABOR_COST.get(truck_cat, 180.0)
+    service_fee = SERVICE_FEE.get(truck_cat, 120.0)
+
+    subtotal_before_multiplier = distance_fare + fuel_maintenance + labor + service_fee
+    traffic_factor, peak_factor, time_factor = _get_runtime_factors(
+        traffic_level, time_period, is_peak_hour
+    )
+    total_multiplier = traffic_factor * peak_factor * time_factor
+
+    deterministic_total = subtotal_before_multiplier * total_multiplier
+    deterministic_total = max(deterministic_total, min_charge)
+    deterministic_total = min(deterministic_total, max_charge)
+
+    return {
+        "distance_fare": float(distance_fare),
+        "fuel_maintenance": float(fuel_maintenance),
+        "labor": float(labor),
+        "service_fee": float(service_fee),
+        "subtotal_before_multiplier": float(subtotal_before_multiplier),
+        "traffic_factor": float(traffic_factor),
+        "peak_factor": float(peak_factor),
+        "time_factor": float(time_factor),
+        "total_multiplier": float(total_multiplier),
+        "deterministic_total": float(deterministic_total),
+        "min_charge": float(min_charge),
+        "max_charge": float(max_charge),
+    }
+
+
+def _distance_fairness_floor(distance_km, truck_cat):
+    """Minimum fair total by distance so extra kilometers are not underpriced."""
+    distance = max(float(distance_km), 0.0)
+    min_charge = KTM_RATES[truck_cat]["min"]
+
+    # Industry-friendly floor profile: fixed short-trip base + guaranteed per-km growth.
+    base_km = 2.0
+    base_total = min_charge
+    per_km_floor = {
+        "SMALL": 40.0,
+        "MEDIUM": 60.0,
+        "LARGE": 85.0,
+    }
+    extra_km = max(0.0, distance - base_km)
+    floor_total = base_total + (extra_km * per_km_floor.get(truck_cat, 60.0))
+    return float(min(floor_total, KTM_RATES[truck_cat]["max"]))
 
 def _calculate_base_price(distance_km, truck_category):
     """Calculate realistic base price for Kathmandu"""
@@ -251,20 +355,114 @@ def predict_price(distance_km, truck_category, traffic_level, time_of_day, is_pe
     traffic_encoded = _label_encoders['traffic_level'].transform([traffic_lev])[0]
     time_encoded = _label_encoders['time_of_day'].transform([time_period])[0]
     
-    # Prepare feature array
-    features = np.array([[distance_km, truck_encoded, traffic_encoded, time_encoded, is_peak_hour]])
-    
-    # Make prediction
-    predicted_price = float(_model.predict(features)[0])
-    
-    # Apply min/max charges
-    min_charges = {'SMALL': 400, 'MEDIUM': 700, 'LARGE': 1200}
-    max_prices = {'SMALL': 1500, 'MEDIUM': 2500, 'LARGE': 4000}
-    
-    min_charge = min_charges.get(truck_cat, 700)
-    max_price = max_prices.get(truck_cat, 2500)
-    
-    final_price = max(predicted_price, min_charge)
+    details = estimate_price_details(
+        distance_km=distance_km,
+        truck_category=truck_category,
+        traffic_level=traffic_level,
+        time_of_day=time_of_day,
+        is_peak_hour=is_peak_hour,
+    )
+    return int(round(details["final_price"]))
+
+
+def estimate_price_details(distance_km, truck_category, traffic_level, time_of_day, is_peak_hour):
+    """Return final price plus transparent pricing breakdown."""
+    global _model, _label_encoders, _features
+
+    if _model is None:
+        _model, _label_encoders, _features = _train_pricing_model()
+
+    assert _label_encoders is not None, "Label encoders not initialized"
+    assert _model is not None, "Model not initialized"
+    assert _features is not None, "Features not initialized"
+
+    truck_map = {
+        'small_vehicle': 'SMALL',
+        'medium_vehicle': 'MEDIUM',
+        'large_vehicle': 'LARGE'
+    }
+    truck_cat = truck_map.get(truck_category, 'MEDIUM')
+
+    traffic_map = {
+        'light': 'Light',
+        'medium': 'Medium',
+        'heavy': 'Heavy',
+        'very_heavy': 'Very Heavy'
+    }
+    traffic_lev = traffic_map.get(traffic_level, 'Medium')
+
+    if isinstance(time_of_day, str) and ':' in time_of_day:
+        hour = int(time_of_day.split(':')[0])
+        if 5 <= hour < 12:
+            time_period = 'Morning'
+        elif 12 <= hour < 17:
+            time_period = 'Afternoon'
+        elif 17 <= hour < 20:
+            time_period = 'Evening'
+        else:
+            time_period = 'Night'
+    else:
+        time_period = time_of_day if time_of_day in ['Morning', 'Afternoon', 'Evening', 'Night'] else 'Afternoon'
+
+    truck_encoded = _label_encoders['truck_category'].transform([truck_cat])[0]
+    traffic_encoded = _label_encoders['traffic_level'].transform([traffic_lev])[0]
+    time_encoded = _label_encoders['time_of_day'].transform([time_period])[0]
+
+    # Deterministic baseline (fair distance scaling)
+    breakdown = _deterministic_breakdown(
+        distance_km=distance_km,
+        truck_cat=truck_cat,
+        traffic_level=traffic_lev,
+        time_period=time_period,
+        is_peak_hour=is_peak_hour,
+    )
+    deterministic = breakdown["deterministic_total"]
+
+    # ML context factor at fixed reference distance to preserve monotonic distance behavior
+    reference_distance = 5.0
+    ref_features = np.array([[reference_distance, truck_encoded, traffic_encoded, time_encoded, is_peak_hour]])
+    ml_ref = float(_model.predict(ref_features)[0])
+    deterministic_ref = _deterministic_price(
+        distance_km=reference_distance,
+        truck_cat=truck_cat,
+        traffic_level=traffic_lev,
+        time_period=time_period,
+        is_peak_hour=is_peak_hour,
+    )
+
+    if deterministic_ref > 0:
+        context_factor = ml_ref / deterministic_ref
+    else:
+        context_factor = 1.0
+
+    # Keep ML influence but prevent extreme distortions
+    context_factor = float(np.clip(context_factor, 0.98, 1.08))
+    hybrid_price = deterministic * context_factor
+
+    fair_floor = _distance_fairness_floor(distance_km, truck_cat)
+
+    min_charge = KTM_RATES[truck_cat]['min']
+    max_price = KTM_RATES[truck_cat]['max']
+    final_price = max(hybrid_price, fair_floor, min_charge)
     final_price = min(final_price, max_price)
-    
-    return int(round(final_price))
+
+    return {
+        "final_price": float(round(final_price, 2)),
+        "truck_category": truck_cat,
+        "time_period": time_period,
+        "traffic_level": traffic_lev,
+        "context_factor": float(round(context_factor, 4)),
+        "fair_floor": float(round(fair_floor, 2)),
+        "breakdown": {
+            "distance_fare": float(round(breakdown["distance_fare"], 2)),
+            "fuel_maintenance": float(round(breakdown["fuel_maintenance"], 2)),
+            "labor": float(round(breakdown["labor"], 2)),
+            "service_fee": float(round(breakdown["service_fee"], 2)),
+            "subtotal_before_multiplier": float(round(breakdown["subtotal_before_multiplier"], 2)),
+            "traffic_factor": float(round(breakdown["traffic_factor"], 2)),
+            "peak_factor": float(round(breakdown["peak_factor"], 2)),
+            "time_factor": float(round(breakdown["time_factor"], 2)),
+            "total_multiplier": float(round(breakdown["total_multiplier"], 4)),
+            "deterministic_total": float(round(breakdown["deterministic_total"], 2)),
+        },
+    }

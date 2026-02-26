@@ -101,11 +101,13 @@ def create_app():
     # Register blueprints
     from admin import admin_bp
     from auth import auth_bp
+    from booking import booking_bp
     from driver import driver_bp
     from rating import rating_bp
     from routes import main_bp
 
     app.register_blueprint(auth_bp)
+    app.register_blueprint(booking_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(driver_bp)
